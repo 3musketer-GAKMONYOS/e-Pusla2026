@@ -1,0 +1,9 @@
+{
+  "name": "e-Pusla App",
+  "description": "Sistem Absensi Online Elegan Informatif Terkini",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}
