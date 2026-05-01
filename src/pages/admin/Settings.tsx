@@ -22,9 +22,9 @@ export default function AdminSettings() {
   const [generalSettings, setGeneralSettings] = useState({
     appName: "Si Abon Eiite App",
     appLogo: "",
-    companyName: "Puskesmas Sehat",
+    companyName: "Instansi Sehat",
     headName: "Dr. Budi Santoso",
-    email: "info@puskesmas.com",
+    email: "info@instansi.com",
     address: "Jl. Kesehatan No. 1",
     mainLocation: "-7.250445, 112.768845"
   });
@@ -132,8 +132,8 @@ export default function AdminSettings() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Data User');
     worksheet.addRow(['ID', 'Nama', 'Email', 'Role']);
-    worksheet.addRow(['1', 'Admin User', 'admin@puskesmas.com', 'Admin']);
-    worksheet.addRow(['2', 'Regular User', 'user@puskesmas.com', 'User']);
+    worksheet.addRow(['1', 'Admin User', 'admin@instansi.com', 'Admin']);
+    worksheet.addRow(['2', 'Regular User', 'user@instansi.com', 'User']);
     
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -239,19 +239,19 @@ export default function AdminSettings() {
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="companyName">Nama Puskesmas/Perusahaan</Label>
+                <Label htmlFor="companyName">Nama Instansi</Label>
                 <Input id="companyName" value={generalSettings.companyName} onChange={handleGeneralChange} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="headName">Nama Kepala Puskesmas/Pimpinan</Label>
+                <Label htmlFor="headName">Nama Kepala Instansi/Pimpinan</Label>
                 <Input id="headName" value={generalSettings.headName} onChange={handleGeneralChange} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="email">Email Puskesmas/Perusahaan</Label>
+                <Label htmlFor="email">Email Instansi</Label>
                 <Input id="email" type="email" value={generalSettings.email} onChange={handleGeneralChange} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="address">Alamat Puskesmas</Label>
+                <Label htmlFor="address">Alamat Instansi</Label>
                 <Input id="address" value={generalSettings.address} onChange={handleGeneralChange} />
               </div>
               <div className="grid gap-2">

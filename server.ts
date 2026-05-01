@@ -20,12 +20,12 @@ async function startServer() {
   // Mock Database (In-Memory for Prototype)
   const db = {
     users: [
-      { id: 1, nip: '000000', name: 'Admin User', email: 'admin@puskesmas.com', role: 'admin', password: 'password', office: 'Kantor Induk', group: 'Superadmin' },
-      { id: 2, nip: '111111', name: 'Regular User', email: 'user@puskesmas.com', role: 'user', password: 'password', office: 'Pustu A' },
+      { id: 1, nip: '000000', name: 'Admin User', email: 'admin@instansi.com', role: 'admin', password: 'password', office: 'Kantor Induk', group: 'Superadmin' },
+      { id: 2, nip: '111111', name: 'Regular User', email: 'user@instansi.com', role: 'user', password: 'password', office: 'Pustu A' },
     ],
     employees: [
-      { id: '1', name: 'Admin User', nip: '000000', office: 'Kantor Induk', email: 'admin@puskesmas.com', gender: 'Laki-laki', cluster: 'Klaster 1', unit: 'Manajemen' },
-      { id: '2', name: 'Regular User', nip: '111111', office: 'Pustu A', email: 'user@puskesmas.com', gender: 'Perempuan', cluster: 'Klaster 2', unit: 'Pustu' }
+      { id: '1', name: 'Admin User', nip: '000000', office: 'Kantor Induk', email: 'admin@instansi.com', gender: 'Laki-laki', cluster: 'Klaster 1', unit: 'Manajemen' },
+      { id: '2', name: 'Regular User', nip: '111111', office: 'Pustu A', email: 'user@instansi.com', gender: 'Perempuan', cluster: 'Klaster 2', unit: 'Pustu' }
     ],
     attendance: [],
     locations: [
@@ -33,7 +33,7 @@ async function startServer() {
     ],
     settings: {
       appName: 'e-Pusla App',
-      companyName: 'Puskesmas Lamongan',
+      companyName: 'Instansi Lamongan',
       headName: 'Dr. Moh. Mahzumi',
       address: 'Jl. Veteran',
       mainLocation: '-7.250445, 112.768845',

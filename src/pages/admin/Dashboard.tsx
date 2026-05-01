@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 
 export default function AdminDashboard() {
   const [appName, setAppName] = useState("Si Abon Megilan");
-  const [companyName, setCompanyName] = useState("Puskesmas Sehat");
+  const [companyName, setCompanyName] = useState("Instansi Sehat");
 
   useEffect(() => {
     const fetchSettings = async () => {

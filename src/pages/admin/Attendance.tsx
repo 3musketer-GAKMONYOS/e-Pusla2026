@@ -23,7 +23,7 @@ export default function AdminAttendance() {
   };
 
   const [generalSettings, setGeneralSettings] = useState<any>({});
-  const puskesmasName = generalSettings.companyName || "Puskesmas Sehat";
+  const puskesmasName = generalSettings.companyName || "Instansi Sehat";
   const pimpinanName = generalSettings.pimpinanName || "Dr. Budi Santoso";
 
   const [absensiSettings, setAbsensiSettings] = useState<any>({});

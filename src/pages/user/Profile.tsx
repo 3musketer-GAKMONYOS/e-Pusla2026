@@ -258,7 +258,7 @@ export default function UserProfile() {
         <CardContent className="space-y-4">
           <div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Kantor / Penempatan</p>
-            <p className="font-medium">{employeeData?.office || 'Puskesmas Induk'}</p>
+            <p className="font-medium">{employeeData?.office || 'Instansi Induk'}</p>
           </div>
           <div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Unit</p>
@@ -266,7 +266,7 @@ export default function UserProfile() {
           </div>
           <div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Email</p>
-            <p className="font-medium">{employeeData?.email || user.email || 'pegawai@puskesmas.com'}</p>
+            <p className="font-medium">{employeeData?.email || user.email || 'pegawai@instansi.com'}</p>
           </div>
         </CardContent>
       </Card>

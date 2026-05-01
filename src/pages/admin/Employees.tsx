@@ -257,8 +257,8 @@ export default function AdminEmployees() {
   const downloadTemplate = () => {
     const wsData = [
       ["Nama", "NIP", "Gender", "Klaster", "Unit", "Kantor", "Kantor2", "Email"],
-      ["Budi Santoso", "198001012005011001", "Laki-laki", "1", "Poli Umum", "Puskesmas Maju Jaya", "", "budi@example.com"],
-      ["Siti Aminah", "198502022010012002", "Perempuan", "2", "Poli Gigi", "Puskesmas Maju Jaya", "Pustu B", "siti@example.com"]
+      ["Budi Santoso", "198001012005011001", "Laki-laki", "1", "Poli Umum", "Instansi Maju Jaya", "", "budi@example.com"],
+      ["Siti Aminah", "198502022010012002", "Perempuan", "2", "Poli Gigi", "Instansi Maju Jaya", "Pustu B", "siti@example.com"]
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -791,7 +791,7 @@ export default function AdminEmployees() {
                       <Input 
                         id="emp-email" 
                         type="email"
-                        placeholder="email@puskesmas.com" 
+                        placeholder="email@instansi.com" 
                         value={newEmpEmail}
                         onChange={(e) => setNewEmpEmail(e.target.value)}
                       />
@@ -888,7 +888,7 @@ export default function AdminEmployees() {
                       <Label htmlFor="loc-name">Nama Desa / Lokasi</Label>
                       <Input 
                         id="loc-name" 
-                        placeholder="Contoh: Desa Sukamaju" 
+                        placeholder="Contoh: Desa Blawi" 
                         value={newLocName}
                         onChange={(e) => setNewLocName(e.target.value)}
                       />
@@ -897,7 +897,7 @@ export default function AdminEmployees() {
                       <Label htmlFor="loc-kecamatan">Kecamatan</Label>
                       <Input 
                         id="loc-kecamatan" 
-                        placeholder="Contoh: Kecamatan Sukamaju" 
+                        placeholder="Contoh: Kecamatan Blawi" 
                         value={newLocKecamatan}
                         onChange={(e) => setNewLocKecamatan(e.target.value)}
                       />
@@ -1128,7 +1128,7 @@ export default function AdminEmployees() {
                         <Input 
                           id="admin-email" 
                           type="email"
-                          placeholder="email@puskesmas.com" 
+                          placeholder="email@instansi.com" 
                           value={newAdminEmail}
                           onChange={(e) => setNewAdminEmail(e.target.value)}
                         />

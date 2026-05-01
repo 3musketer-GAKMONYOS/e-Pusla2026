@@ -344,7 +344,7 @@ export default function Login() {
               <Input 
                 id="regEmail" 
                 type="email" 
-                placeholder="email@puskesmas.com" 
+                placeholder="email@instansi.com" 
                 value={regEmail}
                 onChange={(e) => setRegEmail(e.target.value)}
                 required
@@ -464,7 +464,7 @@ export default function Login() {
               <Input 
                 id="forgotEmail" 
                 type="email" 
-                placeholder="email@puskesmas.com" 
+                placeholder="email@instansi.com" 
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 required
