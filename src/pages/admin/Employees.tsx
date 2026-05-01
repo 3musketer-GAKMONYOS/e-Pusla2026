@@ -888,7 +888,7 @@ export default function AdminEmployees() {
                       <Label htmlFor="loc-name">Nama Desa / Lokasi</Label>
                       <Input 
                         id="loc-name" 
-                        placeholder="Contoh: Desa Blawi" 
+                        placeholder="Contoh: Banjarmendalan" 
                         value={newLocName}
                         onChange={(e) => setNewLocName(e.target.value)}
                       />
@@ -897,7 +897,7 @@ export default function AdminEmployees() {
                       <Label htmlFor="loc-kecamatan">Kecamatan</Label>
                       <Input 
                         id="loc-kecamatan" 
-                        placeholder="Contoh: Kecamatan Blawi" 
+                        placeholder="Contoh: Lamongan" 
                         value={newLocKecamatan}
                         onChange={(e) => setNewLocKecamatan(e.target.value)}
                       />

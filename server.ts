@@ -130,7 +130,7 @@ async function startServer() {
         if (cache['employees'] && Date.now() - cache['employees'].timestamp < CACHE_DURATION) {
           return res.json(cache['employees'].data);
         }
-        const sheet = await getOrCreateSheet('Employees', ['id', 'name', 'nip', 'office', 'office2', 'email', 'gender', 'cluster', 'unit', 'password', 'photoUrl', 'photoUploadCount']);
+        const sheet = await getOrCreateSheet('Employees', ['id', 'name', 'nip', 'office', 'office2', 'office3', 'email', 'gender', 'cluster', 'unit', 'password', 'photoUrl', 'photoUploadCount']);
         if (sheet) {
           const rows = await sheet.getRows();
           const employees = rows.map(row => ({
@@ -139,6 +139,7 @@ async function startServer() {
             nip: row.get('nip'),
             office: row.get('office'),
             office2: row.get('office2'),
+            office3: row.get('office3'),
             email: row.get('email'),
             gender: row.get('gender'),
             cluster: row.get('cluster'),
@@ -162,11 +163,12 @@ async function startServer() {
     
     if (doc) {
       try {
-        const sheet = await getOrCreateSheet('Employees', ['id', 'name', 'nip', 'office', 'office2', 'email', 'gender', 'cluster', 'unit', 'password', 'photoUrl', 'photoUploadCount']);
+        const sheet = await getOrCreateSheet('Employees', ['id', 'name', 'nip', 'office', 'office2', 'office3', 'email', 'gender', 'cluster', 'unit', 'password', 'photoUrl', 'photoUploadCount']);
         if (sheet) {
           await sheet.addRow({
             ...employee,
-            office2: employee.office2 || ''
+            office2: employee.office2 || '',
+            office3: employee.office3 || ''
           });
           delete cache['employees'];
         }
@@ -188,12 +190,13 @@ async function startServer() {
 
     if (doc) {
       try {
-        const sheet = await getOrCreateSheet('Employees', ['id', 'name', 'nip', 'office', 'office2', 'email', 'gender', 'cluster', 'unit', 'password', 'photoUrl', 'photoUploadCount']);
+        const sheet = await getOrCreateSheet('Employees', ['id', 'name', 'nip', 'office', 'office2', 'office3', 'email', 'gender', 'cluster', 'unit', 'password', 'photoUrl', 'photoUploadCount']);
         if (sheet) {
           // Flatten data and add rows
           const rows = employeesData.map(emp => ({
             ...emp,
-            office2: emp.office2 || ''
+            office2: emp.office2 || '',
+            office3: emp.office3 || ''
           }));
           await sheet.addRows(rows);
           delete cache['employees'];
@@ -431,7 +434,7 @@ async function startServer() {
             const rows = await userSheet.getRows();
             const row = rows.find(r => String(r.get('nip') || '').trim() === nip && String(r.get('password') || '').trim() === password);
             if (row) {
-              user = { id: row.get('id'), nip: String(row.get('nip') || '').trim(), name: row.get('name'), role: row.get('role'), office: row.get('office'), office2: row.get('office2') };
+              user = { id: row.get('id'), nip: String(row.get('nip') || '').trim(), name: row.get('name'), role: row.get('role'), office: row.get('office'), office2: row.get('office2'), office3: row.get('office3') };
               console.log('User found:', user.name);
             }
           }
@@ -553,7 +556,7 @@ async function startServer() {
   });
 
   app.post('/api/register', async (req, res) => {
-    const { nip, name, email, password, gender, cluster, unit, desa, office2 } = req.body;
+    const { nip, name, email, password, gender, cluster, unit, desa, office2, office3 } = req.body;
     
     // 1. Validate NIP against Employees data
     let isValidEmployee = false;
@@ -581,7 +584,7 @@ async function startServer() {
     let userExists = false;
     if (doc) {
       try {
-        const userSheet = await getOrCreateSheet('Users', ['id', 'nip', 'name', 'email', 'role', 'password', 'gender', 'cluster', 'unit', 'office', 'office2']);
+        const userSheet = await getOrCreateSheet('Users', ['id', 'nip', 'name', 'email', 'role', 'password', 'gender', 'cluster', 'unit', 'office', 'office2', 'office3']);
         if (userSheet) {
           const rows = await userSheet.getRows();
           userExists = rows.some(r => String(r.get('nip')) === String(nip));
@@ -608,13 +611,14 @@ async function startServer() {
       cluster,
       unit,
       office: desa,
-      office2: office2 || ''
+      office2: office2 || '',
+      office3: office3 || ''
     };
 
     // Save to Google Spreadsheet if configured
     if (doc) {
       try {
-        const sheet = await getOrCreateSheet('Users', ['id', 'nip', 'name', 'email', 'role', 'password', 'gender', 'cluster', 'unit', 'office', 'office2']);
+        const sheet = await getOrCreateSheet('Users', ['id', 'nip', 'name', 'email', 'role', 'password', 'gender', 'cluster', 'unit', 'office', 'office2', 'office3']);
         if (sheet) {
           await sheet.addRow(newUser);
         }

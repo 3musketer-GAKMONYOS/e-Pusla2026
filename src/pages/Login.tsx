@@ -27,6 +27,7 @@ export default function Login() {
   const [regUnit, setRegUnit] = useState('');
   const [regDesa, setRegDesa] = useState('');
   const [regOffice2, setRegOffice2] = useState('');
+  const [regOffice3, setRegOffice3] = useState('');
 
   // Forgot password state
   const [forgotEmail, setForgotEmail] = useState('');
@@ -146,7 +147,8 @@ export default function Login() {
           cluster: regCluster,
           unit: regUnit,
           desa: regDesa,
-          office2: regOffice2
+          office2: regOffice2,
+          office3: regOffice3
         }),
       });
 
@@ -226,7 +228,7 @@ export default function Login() {
             )}
           </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50 text-center">
-            {view === 'login' ? `Selamat Datang di ${appName}!` : view === 'register' ? 'Buat Akun Baru' : 'Lupa Kata Sandi'}
+            {view === 'login' ? `Selamat Datang di Aplikasi Absensi ${appName}` : view === 'register' ? 'Buat Akun Baru' : 'Lupa Kata Sandi'}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-2">
             {view === 'login' ? 'Masuk untuk mengakses dasbor Anda' : view === 'register' ? 'Daftar untuk mulai menggunakan aplikasi' : 'Masukkan email untuk mereset kata sandi Anda'}
@@ -240,7 +242,7 @@ export default function Login() {
               <Input 
                 id="nip" 
                 type="text" 
-                placeholder="-Masukkan NIP-" 
+                placeholder="Masukkan NIP /NIK(Belum Punya NIP)" 
                 value={nip}
                 onChange={(e) => setNip(e.target.value)}
                 required
@@ -322,7 +324,7 @@ export default function Login() {
               <Input 
                 id="regNip" 
                 type="text" 
-                placeholder="-Masukkan NIP-" 
+                placeholder="Masukkan NIP /NIK(Belum punya NIP)" 
                 value={regNip}
                 onChange={(e) => setRegNip(e.target.value)}
                 required
@@ -406,7 +408,7 @@ export default function Login() {
               <Input 
                 id="regDesa" 
                 type="text" 
-                placeholder="Masukkan nama lokasi kantor utama" 
+                placeholder="Masukkan nama desa kantor utama,cth: Jetis" 
                 value={regDesa}
                 onChange={(e) => setRegDesa(e.target.value)}
                 required
@@ -418,9 +420,20 @@ export default function Login() {
               <Input 
                 id="regOffice2" 
                 type="text" 
-                placeholder="Masukkan nama lokasi kantor kedua" 
+                placeholder="Masukkan nama desa kantor kedua,cth: Made" 
                 value={regOffice2}
                 onChange={(e) => setRegOffice2(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="regOffice3">Lokasi Kantor 3 (Opsional)</Label>
+              <Input 
+                id="regOffice3" 
+                type="text" 
+                placeholder="Masukkan nama desa kantor ketiga" 
+                value={regOffice3}
+                onChange={(e) => setRegOffice3(e.target.value)}
               />
             </div>
 
