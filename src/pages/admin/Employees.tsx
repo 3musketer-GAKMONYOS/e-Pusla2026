@@ -22,12 +22,13 @@ export default function AdminEmployees() {
   };
 
   // State for Employees
-  const [employees, setEmployees] = useState<{id: string, name: string, nip: string, office: string, office2?: string, email: string, password?: string, gender?: string, cluster?: string, unit?: string}[]>([]);
+  const [employees, setEmployees] = useState<{id: string, name: string, nip: string, office: string, office2?: string, office3?: string, email: string, password?: string, gender?: string, cluster?: string, unit?: string}[]>([]);
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
   const [newEmpName, setNewEmpName] = useState("");
   const [newEmpNip, setNewEmpNip] = useState("");
   const [newEmpOffice, setNewEmpOffice] = useState("");
   const [newEmpOffice2, setNewEmpOffice2] = useState("");
+  const [newEmpOffice3, setNewEmpOffice3] = useState("");
   const [newEmpEmail, setNewEmpEmail] = useState("");
   const [newEmpGender, setNewEmpGender] = useState("");
   const [newEmpCluster, setNewEmpCluster] = useState("");
@@ -172,6 +173,7 @@ export default function AdminEmployees() {
         nip: newEmpNip,
         office: newEmpOffice,
         office2: newEmpOffice2 === "none" ? "" : newEmpOffice2,
+        office3: newEmpOffice3 === "none" ? "" : newEmpOffice3,
         email: newEmpEmail,
         gender: newEmpGender,
         cluster: newEmpCluster,
@@ -256,9 +258,9 @@ export default function AdminEmployees() {
 
   const downloadTemplate = () => {
     const wsData = [
-      ["Nama", "NIP", "Gender", "Klaster", "Unit", "Kantor", "Kantor2", "Email"],
-      ["Budi Santoso", "198001012005011001", "Laki-laki", "1", "Poli Umum", "Instansi Maju Jaya", "", "budi@example.com"],
-      ["Siti Aminah", "198502022010012002", "Perempuan", "2", "Poli Gigi", "Instansi Maju Jaya", "Pustu B", "siti@example.com"]
+      ["Nama", "NIP", "Gender", "Klaster", "Unit", "Kantor", "Kantor2", "Kantor3", "Email"],
+      ["Budi Santoso", "198001012005011001", "Laki-laki", "1", "Poli Umum", "Instansi Maju Jaya", "", "", "budi@example.com"],
+      ["Siti Aminah", "198502022010012002", "Perempuan", "2", "Poli Gigi", "Instansi Maju Jaya", "Pustu B", "", "siti@example.com"]
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -295,13 +297,14 @@ export default function AdminEmployees() {
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
         // Expected headers mapping (adjust as needed based on Excel format)
-        // name, nip, office, office2, email, gender, cluster, unit
+        // name, nip, office, office2, office3, email, gender, cluster, unit
         const formattedEmployees = jsonData.map((row, index) => ({
           id: (Date.now() + index).toString(),
           name: row.Nama || row.name || "",
           nip: String(row.NIP || row.nip || ""),
           office: row.Kantor || row.office || "",
           office2: row.Kantor2 || row.office2 || "",
+          office3: row.Kantor3 || row.office3 || "",
           email: row.Email || row.email || "",
           gender: row.Gender || row.gender || row["Jenis Kelamin"] || "",
           cluster: row.Klaster || row.cluster || "",
@@ -787,6 +790,20 @@ export default function AdminEmployees() {
                       </Select>
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="emp-office3">Alamat Kantor 3 (Opsional)</Label>
+                      <Select value={newEmpOffice3} onValueChange={setNewEmpOffice3}>
+                        <SelectTrigger id="emp-office3">
+                          <SelectValue placeholder="Pilih Alamat Kantor 3" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Tidak Ada</SelectItem>
+                          {locations.map(loc => (
+                            <SelectItem key={loc.id} value={loc.desa}>{loc.desa}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="emp-email">Email</Label>
                       <Input 
                         id="emp-email" 
@@ -823,6 +840,7 @@ export default function AdminEmployees() {
                         <TableHead>Unit Kerja</TableHead>
                         <TableHead>Alamat Kantor 1</TableHead>
                         <TableHead>Alamat Kantor 2</TableHead>
+                        <TableHead>Alamat Kantor 3</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead className="text-right">Aksi</TableHead>
                       </TableRow>
@@ -837,6 +855,7 @@ export default function AdminEmployees() {
                           <TableCell>{emp.unit || "-"}</TableCell>
                           <TableCell>{emp.office}</TableCell>
                           <TableCell>{emp.office2 || "-"}</TableCell>
+                          <TableCell>{emp.office3 || "-"}</TableCell>
                           <TableCell>{emp.email}</TableCell>
                           <TableCell className="text-right">
                             <Button
