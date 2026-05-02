@@ -17,6 +17,12 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+  // Simple Request Logger
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+  });
+
   // Mock Database (In-Memory for Prototype)
   const db = {
     users: [
@@ -48,31 +54,37 @@ async function startServer() {
   // Cache for spreadsheet data
   const cache: { [key: string]: { data: any; timestamp: number } } = {};
   const CACHE_DURATION = 60 * 1000; // 1 minute cache
-  if (process.env.SPREADSHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-    try {
-      let privateKey = process.env.GOOGLE_PRIVATE_KEY;
-      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-        privateKey = privateKey.substring(1, privateKey.length - 1);
+
+  async function initSpreadsheet() {
+    if (process.env.SPREADSHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+      try {
+        let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+          privateKey = privateKey.substring(1, privateKey.length - 1);
+        }
+        privateKey = privateKey.replace(/\\n/g, '\n');
+        
+        console.log('Attempting to connect to Google Sheets...');
+        const serviceAccountAuth = new JWT({
+          email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          key: privateKey,
+          scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+        doc = new GoogleSpreadsheet(process.env.SPREADSHEET_ID, serviceAccountAuth);
+        await doc.loadInfo();
+        isDocLoaded = true;
+        console.log('Google Spreadsheet connected successfully:', doc.title);
+      } catch (error) {
+        console.error('Failed to connect to Google Spreadsheet:', error);
+        doc = null;
       }
-      privateKey = privateKey.replace(/\\n/g, '\n');
-      
-      console.log('Attempting to connect to Google Sheets...');
-      const serviceAccountAuth = new JWT({
-        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        key: privateKey,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-      });
-      doc = new GoogleSpreadsheet(process.env.SPREADSHEET_ID, serviceAccountAuth);
-      await doc.loadInfo();
-      isDocLoaded = true;
-      console.log('Google Spreadsheet connected successfully:', doc.title);
-    } catch (error) {
-      console.error('Failed to connect to Google Spreadsheet:', error);
-      doc = null;
+    } else {
+      console.warn('Google Sheets environment variables are missing.');
     }
-  } else {
-    console.warn('Google Sheets environment variables are missing.');
   }
+
+  // Start initialization in background
+  initSpreadsheet();
 
   // Helper to get or create sheet
   async function getSheet(title: string) {
@@ -86,7 +98,12 @@ async function startServer() {
         await doc.loadInfo();
         isDocLoaded = true;
       }
-      const sheet = doc.sheetsByTitle[title];
+      let sheet = doc.sheetsByTitle[title];
+      if (!sheet) {
+        // Reload in case it was created manually or by another process
+        await doc.loadInfo();
+        sheet = doc.sheetsByTitle[title];
+      }
       if (!sheet) {
         console.error(`Sheet '${title}' not found in spreadsheet.`);
         return null;
@@ -179,6 +196,7 @@ async function startServer() {
         }
       } catch (error) {
         console.error('Error saving employee to spreadsheet:', error);
+        return res.status(500).json({ success: false, message: 'GoogleAPIError: ' + String(error) });
       }
     } else {
       db.employees.push(employee);
@@ -439,7 +457,7 @@ async function startServer() {
             const rows = await userSheet.getRows();
             const row = rows.find(r => String(r.get('nip') || '').trim() === nip && String(r.get('password') || '').trim() === password);
             if (row) {
-              user = { id: row.get('id'), nip: String(row.get('nip') || '').trim(), name: row.get('name'), role: row.get('role'), office: row.get('office'), office2: row.get('office2'), office3: row.get('office3') };
+              user = { id: row.get('id'), nip: String(row.get('nip') || '').trim(), name: row.get('name'), role: row.get('role'), office: row.get('office'), office2: row.get('office2'), office3: row.get('office3'), unit: row.get('unit') };
               console.log('User found:', user.name);
             }
           }
@@ -629,6 +647,7 @@ async function startServer() {
         }
       } catch (error) {
         console.error('Error saving user to spreadsheet:', error);
+        return res.status(500).json({ success: false, message: 'GoogleAPIError: ' + String(error) });
       }
     } else {
       db.users.push(newUser as any);
@@ -1052,7 +1071,7 @@ async function startServer() {
         if (cache['shifts'] && Date.now() - cache['shifts'].timestamp < CACHE_DURATION) {
           return res.json(cache['shifts'].data);
         }
-        const sheet = await getOrCreateSheet('Shifts', ['id', 'name', 'startTime', 'endTime', 'crossesMidnight', 'isActive']);
+        const sheet = await getOrCreateSheet('Shifts', ['id', 'name', 'startTime', 'endTime', 'crossesMidnight', 'isActive', 'unit', 'checkInDispensationBefore', 'checkInDispensationAfter', 'checkOutDispensationBefore', 'checkOutDispensationAfter', 'fridayEndTime', 'saturdayEndTime']);
         if (sheet) {
           const rows = await sheet.getRows();
           const shifts = rows.map(row => ({
@@ -1061,7 +1080,14 @@ async function startServer() {
             startTime: row.get('startTime'),
             endTime: row.get('endTime'),
             crossesMidnight: String(row.get('crossesMidnight')).toLowerCase() === 'true',
-            isActive: String(row.get('isActive')).toLowerCase() === 'true'
+            isActive: String(row.get('isActive')).toLowerCase() === 'true',
+            unit: row.get('unit') || '',
+            checkInDispensationBefore: row.get('checkInDispensationBefore') ? parseInt(row.get('checkInDispensationBefore')) : 60,
+            checkInDispensationAfter: row.get('checkInDispensationAfter') ? parseInt(row.get('checkInDispensationAfter')) : 60,
+            checkOutDispensationBefore: row.get('checkOutDispensationBefore') ? parseInt(row.get('checkOutDispensationBefore')) : 10,
+            checkOutDispensationAfter: row.get('checkOutDispensationAfter') ? parseInt(row.get('checkOutDispensationAfter')) : 120,
+            fridayEndTime: row.get('fridayEndTime') || '',
+            saturdayEndTime: row.get('saturdayEndTime') || ''
           }));
           cache['shifts'] = { timestamp: Date.now(), data: shifts };
           return res.json(shifts);
@@ -1080,12 +1106,19 @@ async function startServer() {
     const shift = req.body;
     if (doc) {
       try {
-        const sheet = await getOrCreateSheet('Shifts', ['id', 'name', 'startTime', 'endTime', 'crossesMidnight', 'isActive']);
+        const sheet = await getOrCreateSheet('Shifts', ['id', 'name', 'startTime', 'endTime', 'crossesMidnight', 'isActive', 'unit', 'checkInDispensationBefore', 'checkInDispensationAfter', 'checkOutDispensationBefore', 'checkOutDispensationAfter', 'fridayEndTime', 'saturdayEndTime']);
         if (sheet) {
           await sheet.addRow({
             ...shift,
             crossesMidnight: shift.crossesMidnight.toString(),
-            isActive: shift.isActive.toString()
+            isActive: shift.isActive.toString(),
+            unit: shift.unit || '',
+            checkInDispensationBefore: shift.checkInDispensationBefore?.toString() || '60',
+            checkInDispensationAfter: shift.checkInDispensationAfter?.toString() || '60',
+            checkOutDispensationBefore: shift.checkOutDispensationBefore?.toString() || '10',
+            checkOutDispensationAfter: shift.checkOutDispensationAfter?.toString() || '120',
+            fridayEndTime: shift.fridayEndTime || '',
+            saturdayEndTime: shift.saturdayEndTime || ''
           });
           delete cache['shifts'];
         }
@@ -1131,6 +1164,13 @@ async function startServer() {
             rowToUpdate.set('endTime', shift.endTime);
             rowToUpdate.set('crossesMidnight', shift.crossesMidnight.toString());
             rowToUpdate.set('isActive', shift.isActive.toString());
+            rowToUpdate.set('unit', shift.unit || '');
+            rowToUpdate.set('checkInDispensationBefore', shift.checkInDispensationBefore?.toString() || '60');
+            rowToUpdate.set('checkInDispensationAfter', shift.checkInDispensationAfter?.toString() || '60');
+            rowToUpdate.set('checkOutDispensationBefore', shift.checkOutDispensationBefore?.toString() || '10');
+            rowToUpdate.set('checkOutDispensationAfter', shift.checkOutDispensationAfter?.toString() || '120');
+            rowToUpdate.set('fridayEndTime', shift.fridayEndTime || '');
+            rowToUpdate.set('saturdayEndTime', shift.saturdayEndTime || '');
             await rowToUpdate.save();
             delete cache['shifts'];
           }

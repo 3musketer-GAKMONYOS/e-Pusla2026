@@ -130,8 +130,9 @@ export default function UserHome() {
   useEffect(() => {
     if (hasCheckedIn && !hasCheckedOut) {
       if (shifts.length > 0) {
-        const activeShifts = shifts.filter(s => s.isActive);
-        let targetShift = activeShifts[0] || shifts[0];
+        const userUnit = user?.unit || '';
+        const activeShifts = shifts.filter(s => s.isActive && (!s.unit || s.unit === userUnit));
+        let targetShift = activeShifts[0] || shifts.filter(s => (!s.unit || s.unit === userUnit))[0] || shifts[0];
         
         if (activeShifts.length > 1 && checkInTime) {
           let inHour = 0;
@@ -169,12 +170,20 @@ export default function UserHome() {
 
         if (targetShift) {
           const now = new Date();
+          const day = now.getDay();
+          
           let adjustedEndTime = targetShift.endTime;
-          // Custom logic for Jumat (Friday = 5) and Sabtu (Saturday = 6) on shift Pagi
-          if (targetShift?.name?.toLowerCase().includes('pagi')) {
-            if (now.getDay() === 5) {
+          
+          // Use Friday/Saturday specific end times if configured
+          if (day === 5 && targetShift.fridayEndTime) {
+            adjustedEndTime = targetShift.fridayEndTime;
+          } else if (day === 6 && targetShift.saturdayEndTime) {
+            adjustedEndTime = targetShift.saturdayEndTime;
+          } else if (targetShift?.name?.toLowerCase().includes('pagi')) {
+            // Legacy/Fallback fallback for "Pagi" shift if specific fields are empty
+            if (day === 5) {
               adjustedEndTime = "10:50";
-            } else if (now.getDay() === 6) {
+            } else if (day === 6) {
               adjustedEndTime = "12:30";
             }
           }
@@ -189,22 +198,20 @@ export default function UserHome() {
           
           // Handle cross-midnight shifts properly
           if (startHour > endHour) {
-            // Jika jam sekarang >= jam masuk (contoh 22:00 > 20:00), maka shift berakhirmya BESOK
-            // Jika jam sekarang <= jam masuk, itu berarti kita sudah berada di hari berikutnya sebelum shift selesai
             if (now.getHours() >= startHour - 2) { 
               shiftEnd.setDate(shiftEnd.getDate() + 1);
             }
           }
           
-          let minCheckOut = new Date(shiftEnd.getTime() - 10 * 60000); // 10 mins before default
+          const checkOutEarlyMinutes = targetShift.checkOutDispensationBefore !== undefined ? Number(targetShift.checkOutDispensationBefore) : 10;
+          const minCheckOut = new Date(shiftEnd.getTime() - checkOutEarlyMinutes * 60000); 
           
-          // If Friday/Saturday Pagi, the adjustedEndTime IS the allowed checkout time
-          if (targetShift?.name?.toLowerCase().includes('pagi') && (now.getDay() === 5 || now.getDay() === 6)) {
-             minCheckOut = new Date(shiftEnd.getTime()); // Exact time (10:50 or 12:30)
-          }
+          const checkOutLateMinutes = targetShift.checkOutDispensationAfter !== undefined ? Number(targetShift.checkOutDispensationAfter) : 120;
+          const maxCheckOut = new Date(shiftEnd.getTime() + checkOutLateMinutes * 60000); 
+          
+          // Debug logs for development info
+          // console.log(`Shift: ${targetShift.name}, End: ${adjustedEndTime}, Range: ${minCheckOut.toLocaleTimeString()} - ${maxCheckOut.toLocaleTimeString()}`);
 
-          const maxCheckOut = new Date(shiftEnd.getTime() + 2 * 3600000); // 2 hours after
-          
           if (now >= minCheckOut && now <= maxCheckOut) {
             setCanCheckOut(true);
           } else {
@@ -226,7 +233,8 @@ export default function UserHome() {
     if (!hasCheckedIn && shifts.length > 0) {
       const isCountdownEnabled = settings?.absensiSettings?.enableCountdown !== false;
       
-      const activeShifts = shifts.filter(s => s.isActive);
+      const userUnit = user?.unit || '';
+      const activeShifts = shifts.filter(s => s.isActive && (!s.unit || s.unit === userUnit));
       const calculateCheckInCountdown = () => {
         if (!isCountdownEnabled) {
           setCanCheckIn(true);
@@ -290,9 +298,14 @@ export default function UserHome() {
             }
           }
 
-          // Izinkan absen masuk mulai 60 menit sebelum shift dimulai
-          const minCheckIn = new Date(upcomingShiftStart.getTime() - 60 * 60000); 
+          // Izinkan absen masuk mulai dari batas dispensasi sebelum shift dimulai
+          const checkInEarlyMinutes = upcomingShift.checkInDispensationBefore !== undefined ? Number(upcomingShift.checkInDispensationBefore) : 60;
+          const minCheckIn = new Date(upcomingShiftStart.getTime() - checkInEarlyMinutes * 60000); 
           const diffMs = minCheckIn.getTime() - now.getTime();
+
+          // Batas absen masuk telat
+          const checkInLateMinutes = upcomingShift.checkInDispensationAfter !== undefined ? Number(upcomingShift.checkInDispensationAfter) : 60;
+          const maxCheckIn = new Date(upcomingShiftStart.getTime() + checkInLateMinutes * 60000);
 
           if (diffMs > 0) {
             setCanCheckIn(false);
@@ -300,6 +313,9 @@ export default function UserHome() {
             const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
             setCheckInCountdown(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+          } else if (now.getTime() > maxCheckIn.getTime()) {
+            setCanCheckIn(false);
+            setCheckInCountdown('');
           } else {
             setCanCheckIn(true);
             setCheckInCountdown('');
@@ -314,8 +330,9 @@ export default function UserHome() {
     // Timer untuk Absen Pulang (jika sudah absen masuk)
     if (hasCheckedIn && !hasCheckedOut && shiftEndTime) {
       const calculateCountdown = () => {
-        const activeShifts = shifts.filter(s => s.isActive);
-        let targetShift = activeShifts[0] || shifts[0];
+        const userUnit = user?.unit || '';
+        const activeShifts = shifts.filter(s => s.isActive && (!s.unit || s.unit === userUnit));
+        let targetShift = activeShifts[0] || shifts.filter(s => (!s.unit || s.unit === userUnit))[0] || shifts[0];
         
         if (activeShifts.length > 1 && checkInTime) {
           let inHour = 0;
@@ -354,11 +371,17 @@ export default function UserHome() {
         if (!targetShift) return;
 
         const now = new Date();
+        const day = now.getDay();
         let adjustedEndTime = targetShift.endTime;
-        if (targetShift?.name?.toLowerCase().includes('pagi')) {
-          if (now.getDay() === 5) {
+        
+        if (day === 5 && targetShift.fridayEndTime) {
+          adjustedEndTime = targetShift.fridayEndTime;
+        } else if (day === 6 && targetShift.saturdayEndTime) {
+          adjustedEndTime = targetShift.saturdayEndTime;
+        } else if (targetShift?.name?.toLowerCase().includes('pagi')) {
+          if (day === 5) {
             adjustedEndTime = "10:50";
-          } else if (now.getDay() === 6) {
+          } else if (day === 6) {
             adjustedEndTime = "12:30";
           }
         }
