@@ -165,6 +165,7 @@ export default function Login() {
         setRegUnit('');
         setRegDesa('');
         setRegOffice2('');
+        setRegOffice3('');
         setView('login');
       } else {
         toast.error(data.message || 'Pendaftaran gagal');
@@ -228,7 +229,7 @@ export default function Login() {
             )}
           </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50 text-center">
-            {view === 'login' ? `Selamat Datang di Aplikasi Absensi ${appName}` : view === 'register' ? 'Buat Akun Baru' : 'Lupa Kata Sandi'}
+            {view === 'login' ? `Welcome To ${appName}` : view === 'register' ? 'Buat Akun Baru' : 'Lupa Kata Sandi'}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 text-center mt-2">
             {view === 'login' ? 'Masuk untuk mengakses dasbor Anda' : view === 'register' ? 'Daftar untuk mulai menggunakan aplikasi' : 'Masukkan email untuk mereset kata sandi Anda'}
@@ -242,7 +243,7 @@ export default function Login() {
               <Input 
                 id="nip" 
                 type="text" 
-                placeholder="Masukkan NIP /NIK(Belum Punya NIP)" 
+                placeholder="Masukkan NIP/ NIK(jika belum punya NIP)" 
                 value={nip}
                 onChange={(e) => setNip(e.target.value)}
                 required
@@ -324,7 +325,7 @@ export default function Login() {
               <Input 
                 id="regNip" 
                 type="text" 
-                placeholder="Masukkan NIP /NIK(Belum punya NIP)" 
+                placeholder="Masukkan NIP/ NIK(jika belum punya NIP)" 
                 value={regNip}
                 onChange={(e) => setRegNip(e.target.value)}
                 required
@@ -346,7 +347,7 @@ export default function Login() {
               <Input 
                 id="regEmail" 
                 type="email" 
-                placeholder="email@instansi.com" 
+                placeholder="email@puskesmas.com" 
                 value={regEmail}
                 onChange={(e) => setRegEmail(e.target.value)}
                 required
@@ -408,7 +409,7 @@ export default function Login() {
               <Input 
                 id="regDesa" 
                 type="text" 
-                placeholder="Masukkan nama desa kantor utama,cth: Jetis" 
+                placeholder="Masukkan nama desa kantor utama,contoh: Dibee" 
                 value={regDesa}
                 onChange={(e) => setRegDesa(e.target.value)}
                 required
@@ -420,7 +421,7 @@ export default function Login() {
               <Input 
                 id="regOffice2" 
                 type="text" 
-                placeholder="Masukkan nama desa kantor kedua,cth: Made" 
+                placeholder="Masukkan nama desa kantor kedua, contoh: Canditunggal" 
                 value={regOffice2}
                 onChange={(e) => setRegOffice2(e.target.value)}
               />
@@ -477,7 +478,7 @@ export default function Login() {
               <Input 
                 id="forgotEmail" 
                 type="email" 
-                placeholder="email@instansi.com" 
+                placeholder="email@puskesmas.com" 
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 required

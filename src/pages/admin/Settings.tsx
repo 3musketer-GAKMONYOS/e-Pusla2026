@@ -22,9 +22,9 @@ export default function AdminSettings() {
   const [generalSettings, setGeneralSettings] = useState({
     appName: "Si Abon Eiite App",
     appLogo: "",
-    companyName: "Instansi Sehat",
+    companyName: "Puskesmas Sehat",
     headName: "Dr. Budi Santoso",
-    email: "info@instansi.com",
+    email: "info@puskesmas.com",
     address: "Jl. Kesehatan No. 1",
     mainLocation: "-7.250445, 112.768845"
   });
@@ -33,7 +33,8 @@ export default function AdminSettings() {
   // State for Absensi Settings
   const [absensiSettings, setAbsensiSettings] = useState({
     tolerance: "15",
-    enableCountdown: true
+    enableCountdown: true,
+    enableEarlyCheckout: true
   });
   const [isSavingAbsensi, setIsSavingAbsensi] = useState(false);
 
@@ -132,8 +133,8 @@ export default function AdminSettings() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Data User');
     worksheet.addRow(['ID', 'Nama', 'Email', 'Role']);
-    worksheet.addRow(['1', 'Admin User', 'admin@instansi.com', 'Admin']);
-    worksheet.addRow(['2', 'Regular User', 'user@instansi.com', 'User']);
+    worksheet.addRow(['1', 'Admin User', 'admin@puskesmas.com', 'Admin']);
+    worksheet.addRow(['2', 'Regular User', 'user@puskesmas.com', 'User']);
     
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -239,7 +240,7 @@ export default function AdminSettings() {
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="companyName">Nama Instansi</Label>
+                <Label htmlFor="companyName">Nama Instansi/Perusahaan</Label>
                 <Input id="companyName" value={generalSettings.companyName} onChange={handleGeneralChange} />
               </div>
               <div className="grid gap-2">
@@ -247,7 +248,7 @@ export default function AdminSettings() {
                 <Input id="headName" value={generalSettings.headName} onChange={handleGeneralChange} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="email">Email Instansi</Label>
+                <Label htmlFor="email">Email Instansi/Perusahaan</Label>
                 <Input id="email" type="email" value={generalSettings.email} onChange={handleGeneralChange} />
               </div>
               <div className="grid gap-2">
@@ -282,11 +283,32 @@ export default function AdminSettings() {
                   id="enableCountdown"
                   checked={absensiSettings.enableCountdown}
                   onChange={(e) => setAbsensiSettings(prev => ({ ...prev, enableCountdown: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-gray-300 relative cursor-pointer
+                    appearance-none checked:bg-teal-600 checked:border-transparent
+                    after:content-[''] after:hidden checked:after:block
+                    after:absolute after:left-[4px] after:top-0.5 after:w-[5px] after:h-[10px] 
+                    after:border-r-2 after:border-b-2 after:border-white after:rotate-45"
                 />
                 <Label htmlFor="enableCountdown">Aktifkan Hitung Mundur Absensi Masuk</Label>
               </div>
               <p className="text-xs text-slate-500 mt-1">Jika dinonaktifkan, karyawan bebas melakukan absensi jam berapapun.</p>
+              
+              <div className="flex items-center space-x-2 mt-4">
+                <input
+                  type="checkbox"
+                  id="enableEarlyCheckout"
+                  checked={absensiSettings.enableEarlyCheckout}
+                  onChange={(e) => setAbsensiSettings(prev => ({ ...prev, enableEarlyCheckout: e.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 relative cursor-pointer
+                    appearance-none checked:bg-teal-600 checked:border-transparent
+                    after:content-[''] after:hidden checked:after:block
+                    after:absolute after:left-[4px] after:top-0.5 after:w-[5px] after:h-[10px] 
+                    after:border-r-2 after:border-b-2 after:border-white after:rotate-45"
+                />
+                <Label htmlFor="enableEarlyCheckout">Aktifkan Tombol Pulang Cepat</Label>
+              </div>
+              <p className="text-xs text-slate-500 mt-1 mb-4">Mengizinkan karyawan absen pulang lebih awal sebelum waktunya.</p>
+
               <Button className="mt-4" onClick={handleSaveAbsensi} disabled={isSavingAbsensi}>
                 {isSavingAbsensi ? "Menyimpan..." : "Simpan Perubahan"}
               </Button>

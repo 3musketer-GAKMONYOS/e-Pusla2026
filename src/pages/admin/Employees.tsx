@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import * as XLSX from "xlsx";
-import { Plus, Trash2, Upload, FileSpreadsheet, MonitorX, Edit } from "lucide-react";
+import { Plus, Trash2, Upload, FileSpreadsheet, MonitorX } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminEmployees() {
@@ -49,30 +49,29 @@ export default function AdminEmployees() {
     name: string, 
     startTime: string, 
     endTime: string, 
-    crossesMidnight: boolean, 
-    isActive: boolean, 
-    unit?: string, 
-    checkInDispensationBefore?: number, 
-    checkInDispensationAfter?: number, 
-    checkOutDispensationBefore?: number, 
-    checkOutDispensationAfter?: number,
     fridayEndTime?: string,
-    saturdayEndTime?: string
+    saturdayEndTime?: string,
+    checkInBeforeMinutes?: number,
+    checkInAfterMinutes?: number,
+    checkOutBeforeMinutes?: number,
+    checkOutAfterMinutes?: number,
+    crossesMidnight: boolean, 
+    isActive: boolean
   }[]>([]);
   const [isAddShiftOpen, setIsAddShiftOpen] = useState(false);
-  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [newShiftName, setNewShiftName] = useState("");
   const [newShiftStart, setNewShiftStart] = useState("");
   const [newShiftEnd, setNewShiftEnd] = useState("");
-  const [newShiftCrossesMidnight, setNewShiftCrossesMidnight] = useState(false);
-  const [newShiftIsActive, setNewShiftIsActive] = useState(true);
-  const [newShiftUnit, setNewShiftUnit] = useState("all");
-  const [newShiftCheckInBefore, setNewShiftCheckInBefore] = useState("60");
-  const [newShiftCheckInAfter, setNewShiftCheckInAfter] = useState("60");
-  const [newShiftCheckOutBefore, setNewShiftCheckOutBefore] = useState("10");
-  const [newShiftCheckOutAfter, setNewShiftCheckOutAfter] = useState("120");
   const [newShiftFridayEnd, setNewShiftFridayEnd] = useState("");
   const [newShiftSaturdayEnd, setNewShiftSaturdayEnd] = useState("");
+  const [newShiftCheckInBefore, setNewShiftCheckInBefore] = useState(60);
+  const [newShiftCheckInAfter, setNewShiftCheckInAfter] = useState(15);
+  const [newShiftCheckOutBefore, setNewShiftCheckOutBefore] = useState(10);
+  const [newShiftCheckOutAfter, setNewShiftCheckOutAfter] = useState(120);
+  const [newShiftCrossesMidnight, setNewShiftCrossesMidnight] = useState(false);
+  const [newShiftIsActive, setNewShiftIsActive] = useState(true);
+  const [newShiftUnit, setNewShiftUnit] = useState("");
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
 
   // State for Admins
   const [admins, setAdmins] = useState<{id: string, name: string, nip: string, email: string, phone: string, group: string, isActive: boolean, access: string[]}[]>([]);
@@ -223,6 +222,7 @@ export default function AdminEmployees() {
           setNewEmpNip("");
           setNewEmpOffice("");
           setNewEmpOffice2("");
+          setNewEmpOffice3("");
           setNewEmpEmail("");
           setNewEmpGender("");
           setNewEmpCluster("");
@@ -280,9 +280,9 @@ export default function AdminEmployees() {
 
   const downloadTemplate = () => {
     const wsData = [
-      ["Nama", "NIP", "Gender", "Klaster", "Unit", "Kantor", "Kantor2", "Kantor3", "Email"],
-      ["Budi Santoso", "198001012005011001", "Laki-laki", "1", "Poli Umum", "Instansi Maju Jaya", "", "", "budi@example.com"],
-      ["Siti Aminah", "198502022010012002", "Perempuan", "2", "Poli Gigi", "Instansi Maju Jaya", "Pustu B", "", "siti@example.com"]
+      ["Nama", "NIP", "Gender", "Klaster", "Unit", "Kantor", "Kantor2", "Email"],
+      ["Budi Santoso", "198001012005011001", "Laki-laki", "1", "Poli Umum", "Puskesmas Maju Jaya", "", "budi@example.com"],
+      ["Siti Aminah", "198502022010012002", "Perempuan", "2", "Poli Gigi", "Puskesmas Maju Jaya", "Pustu B", "siti@example.com"]
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -441,58 +441,43 @@ export default function AdminEmployees() {
   const handleAddShift = async () => {
     if (newShiftName && newShiftStart && newShiftEnd) {
       const shiftData = {
-        id: editingShiftId || Date.now().toString(),
         name: newShiftName,
         startTime: newShiftStart,
         endTime: newShiftEnd,
+        fridayEndTime: newShiftFridayEnd,
+        saturdayEndTime: newShiftSaturdayEnd,
+        checkInBeforeMinutes: newShiftCheckInBefore,
+        checkInAfterMinutes: newShiftCheckInAfter,
+        checkOutBeforeMinutes: newShiftCheckOutBefore,
+        checkOutAfterMinutes: newShiftCheckOutAfter,
         crossesMidnight: newShiftCrossesMidnight,
         isActive: newShiftIsActive,
-        unit: newShiftUnit === "all" ? "" : newShiftUnit,
-        checkInDispensationBefore: Number(newShiftCheckInBefore),
-        checkInDispensationAfter: Number(newShiftCheckInAfter),
-        checkOutDispensationBefore: Number(newShiftCheckOutBefore),
-        checkOutDispensationAfter: Number(newShiftCheckOutAfter),
-        fridayEndTime: newShiftFridayEnd,
-        saturdayEndTime: newShiftSaturdayEnd
+        unit: newShiftUnit === "none" ? "" : newShiftUnit
       };
       
       try {
-        const response = await fetch(editingShiftId ? `/api/shifts/${editingShiftId}` : '/api/shifts', {
-          method: editingShiftId ? 'PUT' : 'POST',
+        const url = editingShiftId ? `/api/shifts/${editingShiftId}` : '/api/shifts';
+        const method = editingShiftId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+          method,
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(shiftData),
+          body: JSON.stringify({ ...shiftData, id: editingShiftId || Date.now().toString() }),
         });
 
         if (response.ok) {
-          let updatedShifts;
-          if (editingShiftId) {
-            updatedShifts = shifts.map(s => s.id === editingShiftId ? shiftData : s);
-            toast.success("Shift berhasil diubah");
-          } else {
-            updatedShifts = [...shifts, shiftData];
-            toast.success("Shift berhasil ditambahkan");
+          const fetchedRes = await fetch('/api/shifts');
+          if (fetchedRes.ok) {
+            const data = await fetchedRes.json();
+            setShifts(data);
           }
-          setShifts(updatedShifts);
-          localStorage.setItem('shiftsData', JSON.stringify(updatedShifts));
-          
-          setNewShiftName("");
-          setNewShiftStart("");
-          setNewShiftEnd("");
-          setNewShiftCrossesMidnight(false);
-          setNewShiftIsActive(true);
-          setNewShiftUnit("all");
-          setNewShiftCheckInBefore("60");
-          setNewShiftCheckInAfter("60");
-          setNewShiftCheckOutBefore("10");
-          setNewShiftCheckOutAfter("120");
-          setNewShiftFridayEnd("");
-          setNewShiftSaturdayEnd("");
-          setEditingShiftId(null);
+          toast.success(editingShiftId ? "Shift berhasil diperbarui" : "Shift berhasil ditambahkan");
+          resetShiftForm();
           setIsAddShiftOpen(false);
         } else {
-          toast.error(editingShiftId ? "Gagal mengubah shift" : "Gagal menambahkan shift ke server");
+          toast.error("Gagal menyimpan shift ke server");
         }
       } catch (error) {
         console.error("Error saving shift:", error);
@@ -503,20 +488,35 @@ export default function AdminEmployees() {
     }
   };
 
-  const handleEditShiftClick = (shift: any) => {
-    setEditingShiftId(shift.id);
+  const resetShiftForm = () => {
+    setNewShiftName("");
+    setNewShiftStart("");
+    setNewShiftEnd("");
+    setNewShiftFridayEnd("");
+    setNewShiftSaturdayEnd("");
+    setNewShiftCheckInBefore(60);
+    setNewShiftCheckInAfter(15);
+    setNewShiftCheckOutBefore(10);
+    setNewShiftCheckOutAfter(120);
+    setNewShiftCrossesMidnight(false);
+    setNewShiftIsActive(true);
+    setEditingShiftId(null);
+  };
+
+  const handleEditShift = (shift: any) => {
     setNewShiftName(shift.name);
     setNewShiftStart(shift.startTime);
     setNewShiftEnd(shift.endTime);
-    setNewShiftCrossesMidnight(shift.crossesMidnight);
-    setNewShiftIsActive(shift.isActive);
-    setNewShiftUnit(shift.unit || "all");
-    setNewShiftCheckInBefore(shift.checkInDispensationBefore?.toString() || "60");
-    setNewShiftCheckInAfter(shift.checkInDispensationAfter?.toString() || "60");
-    setNewShiftCheckOutBefore(shift.checkOutDispensationBefore?.toString() || "10");
-    setNewShiftCheckOutAfter(shift.checkOutDispensationAfter?.toString() || "120");
     setNewShiftFridayEnd(shift.fridayEndTime || "");
     setNewShiftSaturdayEnd(shift.saturdayEndTime || "");
+    setNewShiftCheckInBefore(shift.checkInBeforeMinutes || 60);
+    setNewShiftCheckInAfter(shift.checkInAfterMinutes || 15);
+    setNewShiftCheckOutBefore(shift.checkOutBeforeMinutes || 10);
+    setNewShiftCheckOutAfter(shift.checkOutAfterMinutes || 120);
+    setNewShiftCrossesMidnight(shift.crossesMidnight);
+    setNewShiftIsActive(shift.isActive);
+    setNewShiftUnit(shift.unit || "none");
+    setEditingShiftId(shift.id);
     setIsAddShiftOpen(true);
   };
 
@@ -770,7 +770,7 @@ export default function AdminEmployees() {
                       <Label htmlFor="emp-nip">NIP</Label>
                       <Input 
                         id="emp-nip" 
-                        placeholder="Masukkan NIP" 
+                        placeholder="Masukkan NIP /NIK (jika belum punya NIP)" 
                         value={newEmpNip}
                         onChange={(e) => setNewEmpNip(e.target.value)}
                       />
@@ -869,7 +869,7 @@ export default function AdminEmployees() {
                       <Input 
                         id="emp-email" 
                         type="email"
-                        placeholder="email@instansi.com" 
+                        placeholder="email@puskesmas.com" 
                         value={newEmpEmail}
                         onChange={(e) => setNewEmpEmail(e.target.value)}
                       />
@@ -968,7 +968,7 @@ export default function AdminEmployees() {
                       <Label htmlFor="loc-name">Nama Desa / Lokasi</Label>
                       <Input 
                         id="loc-name" 
-                        placeholder="Contoh: Banjarmendalan" 
+                        placeholder="Contoh: Blawi" 
                         value={newLocName}
                         onChange={(e) => setNewLocName(e.target.value)}
                       />
@@ -977,7 +977,7 @@ export default function AdminEmployees() {
                       <Label htmlFor="loc-kecamatan">Kecamatan</Label>
                       <Input 
                         id="loc-kecamatan" 
-                        placeholder="Contoh: Lamongan" 
+                        placeholder="Contoh: Karangbinangun" 
                         value={newLocKecamatan}
                         onChange={(e) => setNewLocKecamatan(e.target.value)}
                       />
@@ -1044,32 +1044,18 @@ export default function AdminEmployees() {
               <CardTitle>Konfigurasi Jadwal Kerja</CardTitle>
               <Dialog open={isAddShiftOpen} onOpenChange={setIsAddShiftOpen}>
                 <DialogTrigger render={
-                  <Button className="flex items-center gap-2" onClick={() => {
-                    setEditingShiftId(null);
-                    setNewShiftName("");
-                    setNewShiftStart("");
-                    setNewShiftEnd("");
-                    setNewShiftCrossesMidnight(false);
-                    setNewShiftIsActive(true);
-                    setNewShiftUnit("all");
-                    setNewShiftCheckInBefore("60");
-                    setNewShiftCheckInAfter("60");
-                    setNewShiftCheckOutBefore("10");
-                    setNewShiftCheckOutAfter("120");
-                    setNewShiftFridayEnd("");
-                    setNewShiftSaturdayEnd("");
-                  }}>
+                  <Button className="flex items-center gap-2">
                     <Plus className="h-4 w-4" />
                     Tambah Shift
                   </Button>
-                } />
-                <DialogContent>
+                } onClick={resetShiftForm} />
+                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>{editingShiftId ? "Edit Shift" : "Tambah Shift Baru"}</DialogTitle>
+                    <DialogTitle>{editingShiftId ? 'Edit Shift' : 'Tambah Shift Baru'}</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                  <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="shift-name" className="font-semibold">Nama Shift</Label>
+                      <Label htmlFor="shift-name">Nama Shift</Label>
                       <Input 
                         id="shift-name" 
                         placeholder="Contoh: Pagi, Malam" 
@@ -1077,10 +1063,9 @@ export default function AdminEmployees() {
                         onChange={(e) => setNewShiftName(e.target.value)}
                       />
                     </div>
-
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="shift-start" className="font-semibold text-xs">Jam Awal (Senin-Kamis/Umum)</Label>
+                        <Label htmlFor="shift-start">Jam Awal (Senin-Kamis/Umum)</Label>
                         <Input 
                           id="shift-start" 
                           type="time"
@@ -1089,7 +1074,7 @@ export default function AdminEmployees() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="shift-end" className="font-semibold text-xs">Jam Akhir (Senin-Kamis/Umum)</Label>
+                        <Label htmlFor="shift-end">Jam Akhir (Senin-Kamis/Umum)</Label>
                         <Input 
                           id="shift-end" 
                           type="time"
@@ -1099,98 +1084,91 @@ export default function AdminEmployees() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4 border-t pt-4">
                       <div className="space-y-2">
-                        <Label htmlFor="shift-friday" className="font-bold text-xs text-blue-600">Jam Akhir Hari Jumat (Opsional)</Label>
+                        <Label htmlFor="shift-friday-end" className="text-blue-600">Jam Akhir Hari Jumat (Opsional)</Label>
                         <Input 
-                          id="shift-friday" 
+                          id="shift-friday-end" 
                           type="time"
                           value={newShiftFridayEnd}
                           onChange={(e) => setNewShiftFridayEnd(e.target.value)}
                         />
-                        <p className="text-[10px] text-slate-400">Kosongkan jika sama dengan jam akhir umum.</p>
+                        <p className="text-[10px] text-slate-500">Kosongkan jika sama dengan jam akhir umum.</p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="shift-saturday" className="font-bold text-xs text-orange-600">Jam Akhir Hari Sabtu (Opsional)</Label>
+                        <Label htmlFor="shift-saturday-end" className="text-orange-600">Jam Akhir Hari Sabtu (Opsional)</Label>
                         <Input 
-                          id="shift-saturday" 
+                          id="shift-saturday-end" 
                           type="time"
                           value={newShiftSaturdayEnd}
                           onChange={(e) => setNewShiftSaturdayEnd(e.target.value)}
                         />
-                        <p className="text-[10px] text-slate-400">Kosongkan jika sama dengan jam akhir umum.</p>
+                        <p className="text-[10px] text-slate-500">Kosongkan jika sama dengan jam akhir umum.</p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-8 border-t pt-4">
-                      <div className="space-y-3">
-                        <Label className="font-bold text-xs">Toleransi Absen Masuk</Label>
+                    <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                      <div className="space-y-2">
+                        <Label>Toleransi Absen Masuk</Label>
                         <div className="flex items-center gap-2">
-                          <Input type="number" className="w-16" value={newShiftCheckInBefore} onChange={e => setNewShiftCheckInBefore(e.target.value)} />
-                          <span className="text-[10px] text-slate-500 leading-tight">Menit<br/>sebelum</span>
+                          <Input type="number" value={newShiftCheckInBefore} onChange={e => setNewShiftCheckInBefore(parseInt(e.target.value))} className="w-20" />
+                          <span className="text-xs text-slate-500">Menit sebelum</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Input type="number" className="w-16" value={newShiftCheckInAfter} onChange={e => setNewShiftCheckInAfter(e.target.value)} />
-                          <span className="text-[10px] text-slate-500 leading-tight">Menit<br/>sesudah</span>
+                          <Input type="number" value={newShiftCheckInAfter} onChange={e => setNewShiftCheckInAfter(parseInt(e.target.value))} className="w-20" />
+                          <span className="text-xs text-slate-500">Menit sesudah</span>
                         </div>
                       </div>
-                      <div className="space-y-3">
-                        <Label className="font-bold text-xs">Toleransi Absen Pulang</Label>
+                      <div className="space-y-2">
+                        <Label>Toleransi Absen Pulang</Label>
                         <div className="flex items-center gap-2">
-                          <Input type="number" className="w-16" value={newShiftCheckOutBefore} onChange={e => setNewShiftCheckOutBefore(e.target.value)} />
-                          <span className="text-[10px] text-slate-500 leading-tight">Menit<br/>sebelum</span>
+                          <Input type="number" value={newShiftCheckOutBefore} onChange={e => setNewShiftCheckOutBefore(parseInt(e.target.value))} className="w-20" />
+                          <span className="text-xs text-slate-500">Menit sebelum</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Input type="number" className="w-16" value={newShiftCheckOutAfter} onChange={e => setNewShiftCheckOutAfter(e.target.value)} />
-                          <span className="text-[10px] text-slate-500 leading-tight">Menit<br/>sesudah</span>
+                          <Input type="number" value={newShiftCheckOutAfter} onChange={e => setNewShiftCheckOutAfter(parseInt(e.target.value))} className="w-20" />
+                          <span className="text-xs text-slate-500">Menit sesudah</span>
                         </div>
-                        <p className="text-[9px] text-orange-600 mt-1 leading-tight italic">
-                          Ulangi: Isi "Menit sesudah" minimal 250 jika ingin absen sampai jam 15:00 di hari Jumat/Sabtu.
-                        </p>
+                        <p className="text-[10px] text-amber-600">Ulangi: Isi "Menit sesudah" minimal 250 jika ingin absen sampai jam 15:00 di hari Jumat/Sabtu.</p>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2 border-t pt-2">
-                      <Label htmlFor="shift-unit" className="font-semibold text-xs">Unit Berlaku (Opsional)</Label>
-                      <Select value={newShiftUnit} onValueChange={setNewShiftUnit}>
-                        <SelectTrigger id="shift-unit">
-                          <SelectValue placeholder="Berlaku untuk semua unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Semua Unit</SelectItem>
-                          <SelectItem value="Manajemen">Manajemen</SelectItem>
-                          <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
-                          <SelectItem value="UGD/Rawat Inap">UGD/Rawat Inap</SelectItem>
-                          <SelectItem value="Poned">Poned</SelectItem>
-                          <SelectItem value="Pustu">Pustu</SelectItem>
-                          <SelectItem value="Polindes">Polindes</SelectItem>
-                          <SelectItem value="Ponkesdes">Ponkesdes</SelectItem>
-                          <SelectItem value="Armada">Armada</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2 mt-4">
+                        <Label htmlFor="shift-unit">Unit Berlaku (Opsional)</Label>
+                        <Select value={newShiftUnit} onValueChange={setNewShiftUnit}>
+                          <SelectTrigger id="shift-unit">
+                            <SelectValue placeholder="Pilih Unit Layanan" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Pilih Unit (Opsional)</SelectItem>
+                            <SelectItem value="Manajemen">Manajemen</SelectItem>
+                            <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
+                            <SelectItem value="UGD/Rawat Inap">UGD/Rawat Inap</SelectItem>
+                            <SelectItem value="Poned">Poned</SelectItem>
+                            <SelectItem value="Pustu">Pustu</SelectItem>
+                            <SelectItem value="Polindes">Polindes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-2 pt-2 border-t text-slate-600">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="crosses-midnight" 
-                          checked={newShiftCrossesMidnight}
-                          onCheckedChange={(checked) => setNewShiftCrossesMidnight(checked as boolean)}
-                        />
-                        <Label htmlFor="crosses-midnight" className="text-[11px] font-normal cursor-pointer">
-                          Melewati hari (besok) - Centang jika jam akhir berada di hari berikutnya.
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="shift-is-active" 
-                          checked={newShiftIsActive}
-                          onCheckedChange={(checked) => setNewShiftIsActive(checked as boolean)}
-                        />
-                        <Label htmlFor="shift-is-active" className="text-[11px] font-normal cursor-pointer">
-                          Aktifkan Shift
-                        </Label>
-                      </div>
+                    <div className="flex items-center space-x-2 pt-2 border-t">
+                      <Checkbox 
+                        id="crosses-midnight" 
+                        checked={newShiftCrossesMidnight}
+                        onCheckedChange={(checked) => setNewShiftCrossesMidnight(checked as boolean)}
+                      />
+                      <Label htmlFor="crosses-midnight" className="text-sm font-normal">
+                        Melewati hari (besok) - Centang jika jam akhir berada di hari berikutnya.
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 pt-2">
+                      <Checkbox 
+                        id="shift-is-active" 
+                        checked={newShiftIsActive}
+                        onCheckedChange={(checked) => setNewShiftIsActive(checked as boolean)}
+                      />
+                      <Label htmlFor="shift-is-active" className="text-sm font-normal">
+                        Aktifkan Shift
+                      </Label>
                     </div>
                   </div>
                   <DialogFooter>
@@ -1209,6 +1187,7 @@ export default function AdminEmployees() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nama Shift</TableHead>
+                        <TableHead>Unit</TableHead>
                         <TableHead>Jam Kerja</TableHead>
                         <TableHead>Jumat/Sabtu</TableHead>
                         <TableHead>Toleransi</TableHead>
@@ -1219,28 +1198,29 @@ export default function AdminEmployees() {
                     <TableBody>
                       {shifts.map((shift, index) => (
                         <TableRow key={`${shift.id}-${index}`}>
-                          <TableCell className="font-medium">
-                            <div>{shift.name}</div>
-                            {shift.unit && <div className="text-[10px] text-slate-400 font-normal">{shift.unit}</div>}
-                          </TableCell>
+                          <TableCell className="font-medium">{shift.name}</TableCell>
                           <TableCell>
-                            {shift.startTime} - {shift.endTime} {shift.crossesMidnight && "(+1)"}
+                             {shift.unit ? (
+                                <span className="bg-slate-100 text-slate-800 px-2 py-1 rounded text-[10px] whitespace-nowrap">{shift.unit}</span>
+                             ) : (
+                                <span className="text-slate-400 text-[10px]">Semua Shift</span>
+                             )}
                           </TableCell>
+                          <TableCell>{shift.startTime} - {shift.endTime} {shift.crossesMidnight ? "(+1)" : ""}</TableCell>
                           <TableCell>
-                            <div className="text-[11px] leading-tight text-slate-600">
-                              {shift.fridayEndTime && <div>Jum: {shift.fridayEndTime}</div>}
-                              {shift.saturdayEndTime && <div>Sab: {shift.saturdayEndTime}</div>}
-                              {!shift.fridayEndTime && !shift.saturdayEndTime && <span className="text-slate-300">-</span>}
+                            <div className="text-xs">
+                              {shift.fridayEndTime && <p>Jum: {shift.fridayEndTime}</p>}
+                              {shift.saturdayEndTime && <p>Sab: {shift.saturdayEndTime}</p>}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="text-[11px] leading-tight text-slate-600 font-mono">
-                              <div>In: -{shift.checkInDispensationBefore || 60}/+{shift.checkInDispensationAfter || 60}m</div>
-                              <div>Out: -{shift.checkOutDispensationBefore || 10}/+{shift.checkOutDispensationAfter || 120}m</div>
+                            <div className="text-[10px]">
+                              In: -{shift.checkInBeforeMinutes}/+{shift.checkInAfterMinutes}m<br/>
+                              Out: -{shift.checkOutBeforeMinutes}/+{shift.checkOutAfterMinutes}m
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${shift.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${shift.isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
                               {shift.isActive ? 'Aktif' : 'Nonaktif'}
                             </span>
                           </TableCell>
@@ -1248,26 +1228,24 @@ export default function AdminEmployees() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 px-2 text-[10px]"
+                              className="h-8 px-2 text-xs"
                               onClick={() => handleToggleShiftStatus(shift.id)}
                             >
                               {shift.isActive ? 'Off' : 'On'}
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                              onClick={() => handleEditShiftClick(shift)}
-                              title="Edit Shift"
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2 text-xs"
+                              onClick={() => handleEditShift(shift)}
                             >
-                              <Edit className="h-4 w-4" />
+                              Edit
                             </Button>
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                               onClick={() => handleDeleteShift(shift.id)}
-                              title="Hapus Shift"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -1324,7 +1302,7 @@ export default function AdminEmployees() {
                         <Input 
                           id="admin-email" 
                           type="email"
-                          placeholder="email@instansi.com" 
+                          placeholder="email@puskesmas.com" 
                           value={newAdminEmail}
                           onChange={(e) => setNewAdminEmail(e.target.value)}
                         />

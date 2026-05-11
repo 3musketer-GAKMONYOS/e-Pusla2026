@@ -20,9 +20,11 @@ export default defineConfig(({mode}) => {
           enabled: true
         },
         manifest: {
-          name: 'Si Abon Eiite App',
+          name: 'Si Abon Elite App',
           short_name: 'Si Abon',
           theme_color: '#14b8a6',
+          display: 'standalone',
+          start_url: '/',
           icons: [
             {
               src: '/logo.png',

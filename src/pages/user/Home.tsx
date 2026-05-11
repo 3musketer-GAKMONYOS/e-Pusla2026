@@ -11,6 +11,18 @@ import { Label } from '@/components/ui/label';
 
 import { format } from 'date-fns';
 
+const resolveActiveShifts = (shifts: any[], user?: any, employees: any[] = []) => {
+  const fullUser = user?.nip ? employees.find(e => e.nip === user.nip) || user : user;
+  const activeShiftsRaw = shifts.filter(s => s.isActive);
+  const specificShifts = activeShiftsRaw.filter(s => s.unit && fullUser && s.unit === fullUser.unit);
+  const generalShifts = activeShiftsRaw.filter(s => !s.unit || s.unit === 'none' || s.unit === '');
+  
+  if (specificShifts.length > 0) {
+    return specificShifts;
+  }
+  return generalShifts;
+};
+
 export default function UserHome() {
   const navigate = useNavigate();
   const webcamRef = useRef<Webcam>(null);
@@ -23,7 +35,7 @@ export default function UserHome() {
   const [isWithinRange, setIsWithinRange] = useState(false);
   const [address, setAddress] = useState<string>('');
 
-  const [user, setUser] = useState<{name: string, nip: string, office: string, office2?: string} | null>(null);
+  const [user, setUser] = useState<{name: string, nip: string, office: string, office2?: string, office3?: string, unit?: string} | null>(null);
   const [settings, setSettings] = useState<any>(null);
   const [hasCheckedIn, setHasCheckedIn] = useState(false);
   const [hasCheckedOut, setHasCheckedOut] = useState(false);
@@ -98,11 +110,29 @@ export default function UserHome() {
             }
           }
 
-          const userAtt = data.filter((a: any) => a.nip === nipToCheck && a.date === today);
+          const userAttToday = data.filter((a: any) => a.nip === nipToCheck && a.date === today);
+          const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
+          const userAttYesterday = data.filter((a: any) => a.nip === nipToCheck && a.date === yesterday);
           
-          const inRecord = userAtt.find((a: any) => a.type === 'in');
-          const outRecord = userAtt.find((a: any) => a.type === 'out');
-          const leaveRecord = userAtt.find((a: any) => ['izin', 'sakit', 'Cuti', 'dinas_luar'].includes(a.type));
+          let inRecord = userAttToday.find((a: any) => a.type === 'in');
+          let outRecord = userAttToday.find((a: any) => a.type === 'out');
+          const leaveRecord = userAttToday.find((a: any) => ['izin', 'sakit', 'Cuti', 'dinas_luar'].includes(a.type));
+          
+          let checkInDateStr = today;
+
+          // If no 'in' record today, check if yesterday has an 'in' record but NO 'out' record
+          if (!inRecord) {
+            const yesterdayIn = userAttYesterday.find((a: any) => a.type === 'in');
+            const yesterdayOut = userAttYesterday.find((a: any) => a.type === 'out');
+            if (yesterdayIn && !yesterdayOut) {
+               // Possibly user is on a night shift
+               inRecord = yesterdayIn;
+               checkInDateStr = yesterday;
+            }
+          }
+          
+          // Store the checkin date so we know if it was yesterday
+          localStorage.setItem('lastCheckInDate', checkInDateStr);
           
           if (leaveRecord) {
             setLeaveType(leaveRecord.type);
@@ -130,9 +160,8 @@ export default function UserHome() {
   useEffect(() => {
     if (hasCheckedIn && !hasCheckedOut) {
       if (shifts.length > 0) {
-        const userUnit = user?.unit || '';
-        const activeShifts = shifts.filter(s => s.isActive && (!s.unit || s.unit === userUnit));
-        let targetShift = activeShifts[0] || shifts.filter(s => (!s.unit || s.unit === userUnit))[0] || shifts[0];
+        const activeShifts = resolveActiveShifts(shifts, user, employees);
+        let targetShift = activeShifts[0] || shifts[0];
         
         if (activeShifts.length > 1 && checkInTime) {
           let inHour = 0;
@@ -170,22 +199,13 @@ export default function UserHome() {
 
         if (targetShift) {
           const now = new Date();
-          const day = now.getDay();
-          
           let adjustedEndTime = targetShift.endTime;
           
-          // Use Friday/Saturday specific end times if configured
-          if (day === 5 && targetShift.fridayEndTime) {
+          // Use dynamic Friday/Saturday end times if configured
+          if (now.getDay() === 5 && targetShift.fridayEndTime) {
             adjustedEndTime = targetShift.fridayEndTime;
-          } else if (day === 6 && targetShift.saturdayEndTime) {
+          } else if (now.getDay() === 6 && targetShift.saturdayEndTime) {
             adjustedEndTime = targetShift.saturdayEndTime;
-          } else if (targetShift?.name?.toLowerCase().includes('pagi')) {
-            // Legacy/Fallback fallback for "Pagi" shift if specific fields are empty
-            if (day === 5) {
-              adjustedEndTime = "10:50";
-            } else if (day === 6) {
-              adjustedEndTime = "12:30";
-            }
           }
 
           setShiftEndTime(adjustedEndTime);
@@ -198,20 +218,24 @@ export default function UserHome() {
           
           // Handle cross-midnight shifts properly
           if (startHour > endHour) {
+            // Jika jam sekarang >= jam masuk (contoh 22:00 > 20:00), maka shift berakhirmya BESOK
+            // Jika jam sekarang <= jam masuk, itu berarti kita sudah berada di hari berikutnya sebelum shift selesai
             if (now.getHours() >= startHour - 2) { 
               shiftEnd.setDate(shiftEnd.getDate() + 1);
             }
           }
           
-          const checkOutEarlyMinutes = targetShift.checkOutDispensationBefore !== undefined ? Number(targetShift.checkOutDispensationBefore) : 10;
-          const minCheckOut = new Date(shiftEnd.getTime() - checkOutEarlyMinutes * 60000); 
+          let beforeMinutes = parseInt(targetShift.checkOutBeforeMinutes || '10');
+          // If Friday/Saturday and special end time is set, use 0 minutes grace before (appear exactly at that time)
+          if ((now.getDay() === 5 && targetShift.fridayEndTime) || (now.getDay() === 6 && targetShift.saturdayEndTime)) {
+            beforeMinutes = 0;
+          }
           
-          const checkOutLateMinutes = targetShift.checkOutDispensationAfter !== undefined ? Number(targetShift.checkOutDispensationAfter) : 120;
-          const maxCheckOut = new Date(shiftEnd.getTime() + checkOutLateMinutes * 60000); 
+          const afterMinutes = parseInt(targetShift.checkOutAfterMinutes || '120');
           
-          // Debug logs for development info
-          // console.log(`Shift: ${targetShift.name}, End: ${adjustedEndTime}, Range: ${minCheckOut.toLocaleTimeString()} - ${maxCheckOut.toLocaleTimeString()}`);
-
+          let minCheckOut = new Date(shiftEnd.getTime() - beforeMinutes * 60000); 
+          const maxCheckOut = new Date(shiftEnd.getTime() + afterMinutes * 60000); 
+          
           if (now >= minCheckOut && now <= maxCheckOut) {
             setCanCheckOut(true);
           } else {
@@ -224,7 +248,7 @@ export default function UserHome() {
         setCanCheckOut(true);
       }
     }
-  }, [hasCheckedIn, hasCheckedOut, shifts, checkInTime]);
+  }, [hasCheckedIn, hasCheckedOut, shifts, checkInTime, user, employees]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -233,8 +257,7 @@ export default function UserHome() {
     if (!hasCheckedIn && shifts.length > 0) {
       const isCountdownEnabled = settings?.absensiSettings?.enableCountdown !== false;
       
-      const userUnit = user?.unit || '';
-      const activeShifts = shifts.filter(s => s.isActive && (!s.unit || s.unit === userUnit));
+      const activeShifts = resolveActiveShifts(shifts, user, employees);
       const calculateCheckInCountdown = () => {
         if (!isCountdownEnabled) {
           setCanCheckIn(true);
@@ -298,14 +321,10 @@ export default function UserHome() {
             }
           }
 
-          // Izinkan absen masuk mulai dari batas dispensasi sebelum shift dimulai
-          const checkInEarlyMinutes = upcomingShift.checkInDispensationBefore !== undefined ? Number(upcomingShift.checkInDispensationBefore) : 60;
-          const minCheckIn = new Date(upcomingShiftStart.getTime() - checkInEarlyMinutes * 60000); 
+          // Izinkan absen masuk mulai X menit sebelum shift dimulai
+          const beforeMinutes = parseInt(upcomingShift.checkInBeforeMinutes || '60');
+          const minCheckIn = new Date(upcomingShiftStart.getTime() - beforeMinutes * 60000); 
           const diffMs = minCheckIn.getTime() - now.getTime();
-
-          // Batas absen masuk telat
-          const checkInLateMinutes = upcomingShift.checkInDispensationAfter !== undefined ? Number(upcomingShift.checkInDispensationAfter) : 60;
-          const maxCheckIn = new Date(upcomingShiftStart.getTime() + checkInLateMinutes * 60000);
 
           if (diffMs > 0) {
             setCanCheckIn(false);
@@ -313,9 +332,6 @@ export default function UserHome() {
             const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
             setCheckInCountdown(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-          } else if (now.getTime() > maxCheckIn.getTime()) {
-            setCanCheckIn(false);
-            setCheckInCountdown('');
           } else {
             setCanCheckIn(true);
             setCheckInCountdown('');
@@ -330,9 +346,8 @@ export default function UserHome() {
     // Timer untuk Absen Pulang (jika sudah absen masuk)
     if (hasCheckedIn && !hasCheckedOut && shiftEndTime) {
       const calculateCountdown = () => {
-        const userUnit = user?.unit || '';
-        const activeShifts = shifts.filter(s => s.isActive && (!s.unit || s.unit === userUnit));
-        let targetShift = activeShifts[0] || shifts.filter(s => (!s.unit || s.unit === userUnit))[0] || shifts[0];
+        const activeShifts = resolveActiveShifts(shifts, user, employees);
+        let targetShift = activeShifts[0] || shifts[0];
         
         if (activeShifts.length > 1 && checkInTime) {
           let inHour = 0;
@@ -371,19 +386,12 @@ export default function UserHome() {
         if (!targetShift) return;
 
         const now = new Date();
-        const day = now.getDay();
         let adjustedEndTime = targetShift.endTime;
         
-        if (day === 5 && targetShift.fridayEndTime) {
+        if (now.getDay() === 5 && targetShift.fridayEndTime) {
           adjustedEndTime = targetShift.fridayEndTime;
-        } else if (day === 6 && targetShift.saturdayEndTime) {
+        } else if (now.getDay() === 6 && targetShift.saturdayEndTime) {
           adjustedEndTime = targetShift.saturdayEndTime;
-        } else if (targetShift?.name?.toLowerCase().includes('pagi')) {
-          if (day === 5) {
-            adjustedEndTime = "10:50";
-          } else if (day === 6) {
-            adjustedEndTime = "12:30";
-          }
         }
 
         const [endHour, endMinute] = adjustedEndTime.split(':').map(Number);
@@ -415,7 +423,7 @@ export default function UserHome() {
     }
     
     return () => clearInterval(interval);
-  }, [hasCheckedIn, hasCheckedOut, shiftEndTime, shifts, checkInTime, settings]);
+  }, [hasCheckedIn, hasCheckedOut, shiftEndTime, shifts, checkInTime, settings, user, employees]);
 
   const fetchLocation = () => {
     setIsLocating(true);
@@ -549,6 +557,7 @@ export default function UserHome() {
       
       const officeAddress = user?.office?.toLowerCase() || '';
       const officeAddress2 = user?.office2?.toLowerCase() || '';
+      const officeAddress3 = user?.office3?.toLowerCase() || '';
       const locationNameLower = detectedAddress.toLowerCase();
       
       let withinRange = false;
@@ -576,7 +585,7 @@ export default function UserHome() {
         return false;
       };
 
-      if (isNameMatch(officeAddress, locationNameLower) || isNameMatch(officeAddress2, locationNameLower)) {
+      if (isNameMatch(officeAddress, locationNameLower) || isNameMatch(officeAddress2, locationNameLower) || isNameMatch(officeAddress3, locationNameLower)) {
         withinRange = true;
       }
 
@@ -586,9 +595,9 @@ export default function UserHome() {
         withinRange = locations.some(loc => {
           if (!loc.coordinates) return false;
           
-          // Hanya cek lokasi yang namanya sesuai dengan office atau office2 user
+          // Hanya cek lokasi yang namanya sesuai dengan office atau office2 atau office3 user
           const locNameLower = (loc.desa || loc.name || '').toLowerCase();
-          const isUserLocation = isNameMatch(officeAddress, locNameLower) || isNameMatch(officeAddress2, locNameLower);
+          const isUserLocation = isNameMatch(officeAddress, locNameLower) || isNameMatch(officeAddress2, locNameLower) || isNameMatch(officeAddress3, locNameLower);
           
           if (!isUserLocation) return false;
 
@@ -696,7 +705,7 @@ export default function UserHome() {
     return R * c * 1000; // Distance in meters
   };
 
-  const handleAbsen = async () => {
+  const handleAbsen = async (isEarlyCheckout = false) => {
     if (!webcamRef.current || !location) return;
 
     const imageSrc = webcamRef.current.getScreenshot();
@@ -795,11 +804,11 @@ export default function UserHome() {
         body: JSON.stringify({
           nip: submitNip,
           name: submitName,
-          date: format(new Date(), 'yyyy-MM-dd'),
+          date: submitType === 'out' ? (localStorage.getItem('lastCheckInDate') || format(new Date(), 'yyyy-MM-dd')) : format(new Date(), 'yyyy-MM-dd'),
           time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
           type: submitType,
           location: { lat: location.lat, lng: location.lng, address: address },
-          status: (isTambahJaga || replacingFriendNip) ? 'Hadir (Ganti Jaga)' : 'Hadir',
+          status: (isTambahJaga || replacingFriendNip) ? 'Hadir (Ganti Jaga)' : (isEarlyCheckout ? 'Hadir (Pulang Cepat)' : 'Hadir'),
           photoUrl: compressedImageSrc,
           shift: nextShift?.name || 'Reguler'
         }),
@@ -888,6 +897,7 @@ export default function UserHome() {
                 <p><strong>NIP:</strong> {replacingFriendNip || user.nip}</p>
                 <p><strong>Kantor 1:</strong> {user.office}</p>
                 {user.office2 && <p><strong>Kantor 2:</strong> {user.office2}</p>}
+                {user.office3 && <p><strong>Kantor 3:</strong> {user.office3}</p>}
               </div>
             )}
           </CardHeader>
@@ -902,20 +912,6 @@ export default function UserHome() {
                   {leaveType === 'dinas_luar' && "Selamat menjalankan dinas luar, tetap semangat dan jaga kesehatan!"}
                 </AlertDescription>
               </Alert>
-            ) : hasCheckedIn && !canCheckOut && !hasCheckedOut && !isTambahJaga ? (
-              <>
-                <Alert className="bg-teal-50 dark:bg-teal-950/50 border-teal-200 dark:border-teal-900 text-teal-700 dark:text-teal-400 flex flex-col items-center justify-center py-6">
-                  <CheckCircle2 className="w-8 h-8 text-teal-600 dark:text-teal-500 mb-2" />
-                  <AlertDescription className="text-center space-y-4">
-                    <p>Anda telah melakukan absen MASUK pada <strong>{checkInTime}</strong></p>
-                    <p>Silahkan Absen Pulang pada Jam <strong>{shiftEndTime}</strong></p>
-                    <div className="mt-4">
-                      <p className="text-sm text-teal-600/80 dark:text-teal-500/80 mb-1">Waktu Menuju Absen Pulang:</p>
-                      <p className="text-5xl font-mono font-bold text-slate-800 dark:text-white tracking-wider">{countdown}</p>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              </>
             ) : hasCheckedOut && !isTambahJaga ? (
               <>
                 <Alert className="bg-teal-50 dark:bg-teal-950/50 border-teal-200 dark:border-teal-900 text-teal-700 dark:text-teal-400">
@@ -930,6 +926,19 @@ export default function UserHome() {
               </>
             ) : (
               <>
+                {hasCheckedIn && !canCheckOut && !hasCheckedOut && !isTambahJaga && (
+                  <Alert className="bg-teal-50 dark:bg-teal-950/50 border-teal-200 dark:border-teal-900 text-teal-700 dark:text-teal-400 flex flex-col items-center justify-center py-4">
+                    <CheckCircle2 className="w-6 h-6 text-teal-600 dark:text-teal-500 mb-1" />
+                    <AlertDescription className="text-center space-y-2">
+                      <p className="text-sm">Anda telah melakukan absen MASUK pada <strong>{checkInTime}</strong></p>
+                      <div className="mt-2">
+                        <p className="text-xs text-teal-600/80 dark:text-teal-500/80 mb-1">Waktu Menuju Absen Pulang:</p>
+                        <p className="text-4xl font-mono font-bold text-slate-800 dark:text-white tracking-wider">{countdown}</p>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {isTambahJaga && (
                   <div className="mb-4">
                     <div className="flex justify-between items-center mb-2">
@@ -1004,12 +1013,27 @@ export default function UserHome() {
                 </div>
 
                 <Button
-                  onClick={() => (!isWithinRange && !hasCheckedIn) ? navigate('/user/leave') : handleAbsen()}
+                  onClick={() => (!isWithinRange && !hasCheckedIn) ? navigate('/user/leave') : handleAbsen(false)}
                   disabled={!location || isAbsenting || (!canCheckIn && !hasCheckedIn && isWithinRange) || (isTambahJaga && !selectedFriendNip) || (hasCheckedIn && !canCheckOut) || (hasCheckedIn && !isWithinRange)}
                   className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 rounded-lg shadow-[0_0_10px_rgba(20,184,166,0.5)] transition-all disabled:opacity-50"
                 >
                   {isAbsenting ? 'Memproses...' : (!isWithinRange && !hasCheckedIn) ? 'Ajukan Izin' : (!isWithinRange && hasCheckedIn) ? 'Di Luar Jangkauan Radius' : (isTambahJaga ? 'Absen Masuk (Ganti Teman)' : replacingFriendNip ? 'Absen Pulang (Ganti Jaga)' : hasCheckedIn ? 'Absen Pulang' : (canCheckIn ? 'Absen Masuk' : 'Belum Waktunya'))}
                 </Button>
+
+                {hasCheckedIn && !canCheckOut && !hasCheckedOut && !isTambahJaga && !replacingFriendNip && settings?.absensiSettings?.enableEarlyCheckout !== false && (
+                  <Button
+                    onClick={() => {
+                      if (window.confirm("Peringatan: Pulang Cepat akan mengurangi jam kerja efektif dalam satu bulan ini. Apakah Anda yakin ingin pulang cepat?")) {
+                        handleAbsen(true);
+                      }
+                    }}
+                    disabled={isAbsenting || !isWithinRange}
+                    variant="outline"
+                    className="w-full mt-3 border-orange-500 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-500/10 font-bold py-3 rounded-lg shadow-[0_0_10px_rgba(249,115,22,0.1)] transition-all"
+                  >
+                    {isAbsenting ? 'Memproses...' : !isWithinRange ? 'Pulang Cepat (Di Luar Radius)' : 'Pulang Cepat'}
+                  </Button>
+                )}
                 
                 {!isTambahJaga && !hasCheckedIn && !replacingFriendNip && (
                   <Button onClick={() => setIsTambahJaga(true)} className="w-full mt-4 border-teal-500 text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/30" variant="outline">

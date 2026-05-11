@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Download, Search, Plus, Upload, Trash2, Users, TrendingUp, Clock, CalendarDays, Award, AlertTriangle, Timer, Check, X, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import ExcelJS from 'exceljs';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, BarChart, Bar, LabelList } from 'recharts';
 import { format } from 'date-fns';
 
 export default function AdminAttendance() {
@@ -23,11 +23,27 @@ export default function AdminAttendance() {
   };
 
   const [generalSettings, setGeneralSettings] = useState<any>({});
-  const puskesmasName = generalSettings.companyName || "Instansi Sehat";
+  const puskesmasName = generalSettings.companyName || "Puskesmas Sehat";
   const pimpinanName = generalSettings.pimpinanName || "Dr. Budi Santoso";
 
   const [absensiSettings, setAbsensiSettings] = useState<any>({});
   const [shifts, setShifts] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const response = await fetch('/api/employees');
+        if (response.ok) {
+          const data = await response.json();
+          setEmployees(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch employees:', error);
+      }
+    };
+    fetchEmployees();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -106,11 +122,17 @@ export default function AdminAttendance() {
     return h * 60 + m;
   };
 
-  const getShiftForTime = (timeMinutes: number) => {
+  const getShiftForTime = (timeMinutes: number, unit?: string) => {
     if (!shifts || shifts.length === 0) return { name: "Pagi", start: 8 * 60, end: 16 * 60, tolerance: parseInt(absensiSettings.tolerance || '15') };
     
-    const activeShifts = shifts.filter(s => s.isActive);
-    let bestShift = activeShifts[0] || shifts[0];
+    const activeShiftsRaw = shifts.filter(s => s.isActive);
+    const specificShifts = activeShiftsRaw.filter(s => s.unit && s.unit === unit);
+    const generalShifts = activeShiftsRaw.filter(s => !s.unit || s.unit === 'none' || s.unit === '');
+    
+    const activeShifts = specificShifts.length > 0 ? specificShifts : generalShifts;
+    if (activeShifts.length === 0) return { name: "Pagi", start: 8 * 60, end: 16 * 60, tolerance: parseInt(absensiSettings.tolerance || '15') };
+
+    let bestShift = activeShifts[0];
     let minDiff = Infinity;
     
     // Evaluate closest shift start time
@@ -126,39 +148,121 @@ export default function AdminAttendance() {
       }
     });
 
+    const now = new Date();
+    const day = now.getDay();
+    let endTimeStr = bestShift.endTime;
+    if (day === 5 && bestShift.fridayEndTime) {
+      endTimeStr = bestShift.fridayEndTime;
+    } else if (day === 6 && bestShift.saturdayEndTime) {
+      endTimeStr = bestShift.saturdayEndTime;
+    }
+
     return {
       name: bestShift.name,
       start: parseTime(bestShift.startTime),
-      end: parseTime(bestShift.endTime),
-      tolerance: parseInt(absensiSettings.tolerance || '15')
+      end: parseTime(endTimeStr),
+      tolerance: parseInt(bestShift.checkInAfterMinutes || absensiSettings.tolerance || '15')
     };
   };
 
   // Process attendance data for Harian
-  const processedHarian = attendanceData.filter(a => a.date === format(today, 'yyyy-MM-dd')).map(a => {
-    const isIzin = ['izin', 'Sakit', 'Cuti', 'Dinas Luar', 'pending'].includes(a.status);
-    const locationVal = typeof a.location === 'object' && a.location !== null ? a.location.reason || a.location.address || JSON.stringify(a.location) : a.location;
+  const todayStr = format(today, 'yyyy-MM-dd');
+  
+  // Get all attendance data sorted by date and time to process chronologically
+  const sortedRecords = [...attendanceData].sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.time === '-' ? '00:00' : a.time}:00`);
+      const dateB = new Date(`${b.date}T${b.time === '-' ? '00:00' : b.time}:00`);
+      return dateA.getTime() - dateB.getTime();
+  });
+
+  const processedHarianRaw: any[] = [];
+  
+  // Group by NIP first to process each person's timeline
+  const nipGroups = sortedRecords.reduce((acc: any, curr: any) => {
+      if (!acc[curr.nip]) acc[curr.nip] = [];
+      acc[curr.nip].push(curr);
+      return acc;
+  }, {});
+
+  Object.values(nipGroups).forEach((records: any) => {
+      let currentSession: any = null;
+      
+      records.forEach((record: any) => {
+          const isLeave = ['izin', 'sakit', 'Cuti', 'dinas_luar', 'pending'].includes(record.type) || ['izin', 'Sakit', 'Cuti', 'Dinas Luar', 'pending'].includes(record.status);
+          
+          if (isLeave) {
+              if (record.date === todayStr) {
+                  processedHarianRaw.push({ inRecord: null, outRecord: null, leaveRecord: record });
+              }
+          } else if (record.type === 'in') {
+              // If there was an unclosed session, ignore it and start a new one (or push as missing checkout)
+              if (currentSession && currentSession.inRecord.date === todayStr) {
+                  processedHarianRaw.push({ ...currentSession });
+              }
+              currentSession = { inRecord: record, outRecord: null, leaveRecord: null };
+          } else if (record.type === 'out') {
+              if (currentSession) {
+                  currentSession.outRecord = record;
+                  if (currentSession.inRecord.date === todayStr || record.date === todayStr) {
+                      // If the session started today OR finished today, we need to decide if we show it.
+                      // Usually, we only show it on the day it STARTED. (Night shift checkout today belongs to yesterday's Harian)
+                      if (currentSession.inRecord.date === todayStr) {
+                         processedHarianRaw.push({ ...currentSession });
+                      }
+                  }
+                  currentSession = null;
+              } else {
+                  // Orphaned out record (e.g. checked out without checking in)
+                  if (record.date === todayStr) {
+                      processedHarianRaw.push({ inRecord: null, outRecord: record, leaveRecord: null });
+                  }
+              }
+          }
+      });
+      // If there's an unclosed session remaining for today
+      if (currentSession && currentSession.inRecord.date === todayStr) {
+          processedHarianRaw.push({ ...currentSession });
+      }
+  });
+
+  const processedHarian = processedHarianRaw.map((session: any) => {
+    const { inRecord, outRecord, leaveRecord } = session;
+    const baseRecord = inRecord || outRecord || leaveRecord;
+    if (!baseRecord) return null;
     
-    let shiftDisplay = "-";
-    if (a.time && a.time !== "-") {
-      const t = parseTime(a.time);
-      const shift = getShiftForTime(t);
+    const isIzin = ['izin', 'Sakit', 'Cuti', 'Dinas Luar', 'pending'].includes(baseRecord.status);
+    const locationVal = typeof baseRecord.location === 'object' && baseRecord.location !== null ? baseRecord.location.reason || baseRecord.location.address || JSON.stringify(baseRecord.location) : baseRecord.location;
+    
+    let shiftDisplay = baseRecord.shift || "-";
+    if (inRecord && inRecord.time && inRecord.time !== "-") {
+      const empUnit = employees.find(e => e.nip === baseRecord.nip)?.unit;
+      const t = parseTime(inRecord.time);
+      const shift = getShiftForTime(t, empUnit);
       if (shift && shift.name) {
         shiftDisplay = shift.name;
       }
     }
 
+    let displayStatus = inRecord?.status || outRecord?.status || leaveRecord?.status || baseRecord.status;
+    if (outRecord && outRecord.status === 'Hadir (Pulang Cepat)') {
+        displayStatus = outRecord.status;
+    } else if (outRecord && outRecord.status === 'Hadir (Ganti Jaga)') {
+        displayStatus = outRecord.status;
+    } else if (inRecord && inRecord.status === 'Hadir (Ganti Jaga)') {
+        displayStatus = inRecord.status;
+    }
+
     return {
-      nama: a.name,
-      nip: a.nip,
+      nama: baseRecord.name,
+      nip: baseRecord.nip,
       kantor: isIzin ? "-" : locationVal,
       shift: shiftDisplay,
-      status: a.status,
-      jamMasuk: a.type === 'in' ? a.time : "-",
-      jamKeluar: a.type === 'out' ? a.time : "-",
+      status: displayStatus,
+      jamMasuk: inRecord ? inRecord.time : "-",
+      jamKeluar: outRecord ? outRecord.time : "-",
       keterangan: isIzin ? locationVal : "-"
     };
-  });
+  }).filter(Boolean);
 
   // Fallback to mock if empty for demonstration
   const displayHarian = processedHarian.length > 0 ? processedHarian : [
@@ -166,44 +270,96 @@ export default function AdminAttendance() {
   ];
 
   // Process attendance data for Bulanan
-  const [employees, setEmployees] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const response = await fetch('/api/employees');
-        if (response.ok) {
-          const data = await response.json();
-          setEmployees(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch employees:', error);
-      }
-    };
-    fetchEmployees();
-  }, []);
 
   const bulananData = employees.map(emp => {
     const empAttendance = attendanceData.filter(a => a.nip === emp.nip);
     const attendanceMap: any = {};
+    let totalHoursCount = 0;
+
     dates.forEach(date => {
-      const dayAtt = empAttendance.find(a => a.date === date);
-      let status = '-';
-      if (dayAtt) {
-        if (dayAtt.status === 'Hadir' || dayAtt.status?.includes('Hadir')) status = 'M';
-        else if (dayAtt.status === 'izin') status = 'I';
-        else if (dayAtt.status === 'Sakit' || dayAtt.type === 'sakit') status = 'S';
-        else if (dayAtt.status === 'Cuti') status = 'C';
-        else if (dayAtt.status === 'Dinas Luar') status = 'D';
-        else if (dayAtt.status === 'pending') status = 'P';
-        else status = dayAtt.status?.[0] || 'M';
+      const recordsForDate = empAttendance.filter(a => a.date === date);
+      let statusInfo = { code: '-', hours: 0, onlyIn: false, bgColor: '' };
+      
+      const inRecord = recordsForDate.find(a => a.type === 'in');
+      let outRecord = recordsForDate.find(a => a.type === 'out');
+      const leaveRecord = recordsForDate.find(a => ['izin', 'sakit', 'Cuti', 'dinas_luar', 'pending'].includes(a.type) || ['izin', 'Sakit', 'Cuti', 'Dinas Luar', 'pending'].includes(a.status));
+
+      if (leaveRecord) {
+        if (leaveRecord.status === 'izin' || leaveRecord.type === 'izin') statusInfo.code = 'I';
+        else if (leaveRecord.status === 'Sakit' || leaveRecord.type === 'sakit') statusInfo.code = 'S';
+        else if (leaveRecord.status === 'Cuti' || leaveRecord.type === 'Cuti') statusInfo.code = 'C';
+        else if (leaveRecord.status === 'Dinas Luar' || leaveRecord.type === 'dinas_luar') {
+          statusInfo.code = 'D';
+          statusInfo.hours = 7;
+        }
+        else if (leaveRecord.status === 'pending') statusInfo.code = 'P';
+        else statusInfo.code = leaveRecord.status?.[0] || 'M';
+      } else if (inRecord) {
+        statusInfo.code = 'M';
+        
+        // Handle cross-midnight out record from the next day if missing today
+        if (!outRecord) {
+          const dateParts = date.split('-');
+          const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+          const nextDay = new Date(dateObj.getTime() + 86400000);
+          const nextDayStr = [
+                 nextDay.getFullYear(),
+                 String(nextDay.getMonth() + 1).padStart(2, '0'),
+                 String(nextDay.getDate()).padStart(2, '0')
+          ].join('-');
+          const nextDayOut = empAttendance.find(a => a.date === nextDayStr && a.type === 'out');
+          const nextDayIn = empAttendance.find(a => a.date === nextDayStr && a.type === 'in');
+          if (nextDayOut && !nextDayIn) {
+            outRecord = nextDayOut;
+          }
+        }
+
+        if (outRecord) {
+          // Calculate duration between inRecord.time and outRecord.time
+          let inParts = inRecord.time.split(/[:.]/);
+          let outParts = outRecord.time.split(/[:.]/);
+          if (inParts.length >= 2 && outParts.length >= 2) {
+             let inH = parseInt(inParts[0]), inM = parseInt(inParts[1]);
+             let outH = parseInt(outParts[0]), outM = parseInt(outParts[1]);
+             let durationH = outH - inH + (outM - inM) / 60;
+             if (durationH < 0) durationH += 24; // Cross midnight
+             statusInfo.hours = Number(durationH.toFixed(2));
+          }
+          statusInfo.onlyIn = false;
+        } else {
+          // Only 'in' record
+          statusInfo.hours = 6;
+          statusInfo.onlyIn = true;
+          statusInfo.bgColor = 'bg-yellow-200 dark:bg-yellow-900/50';
+        }
+      } else if (outRecord) {
+         // Check if this outRecord belongs to yesterday's inRecord.
+         // If it does, we shouldn't mark it as 'M' today.
+         const dateParts = date.split('-');
+         const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+         const prevDay = new Date(dateObj.getTime() - 86400000);
+         const prevDayStr = [
+             prevDay.getFullYear(),
+             String(prevDay.getMonth() + 1).padStart(2, '0'),
+             String(prevDay.getDate()).padStart(2, '0')
+         ].join('-');
+         
+         const prevDayIn = empAttendance.find(a => a.date === prevDayStr && a.type === 'in');
+         if (prevDayIn) {
+             statusInfo.code = '-'; // Belongs to yesterday's shift
+         } else {
+             statusInfo.code = 'M';
+         }
       }
-      attendanceMap[date] = status;
+      
+      attendanceMap[date] = statusInfo;
+      totalHoursCount += statusInfo.hours;
     });
+    
     return {
       nama: emp.name,
       nip: emp.nip,
-      totalHours: empAttendance.length * 8 + " jam", // Simplified
+      totalHours: Number(totalHoursCount.toFixed(2)) + " jam",
       attendance: attendanceMap
     };
   });
@@ -228,19 +384,17 @@ export default function AdminAttendance() {
   // State for Analisa Data Filter
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [filteredAttendance, setFilteredAttendance] = useState<any[]>(attendanceData);
-
-  const handleApplyFilter = () => {
-    const filtered = attendanceData.filter(a => {
+  
+  const filteredAttendance = useMemo(() => {
+    return attendanceData.filter(a => {
       const date = new Date(a.date);
       return date.getMonth().toString() === selectedMonth && date.getFullYear().toString() === selectedYear;
     });
-    setFilteredAttendance(filtered);
-  };
+  }, [attendanceData, selectedMonth, selectedYear]);
 
-  useEffect(() => {
-    setFilteredAttendance(attendanceData);
-  }, [attendanceData]);
+  const handleApplyFilter = () => {
+    // Redundant now, handled by useMemo, but keeping it for button compatibility
+  };
 
 
   const {
@@ -260,7 +414,8 @@ export default function AdminAttendance() {
       dayAtt.forEach(a => {
         if (a.type === 'in') {
           const t = parseTime(a.time);
-          const shift = getShiftForTime(t);
+          const empUnit = employees.find(e => e.nip === a.nip)?.unit;
+          const shift = getShiftForTime(t, empUnit);
           if (t <= shift.start + shift.tolerance) {
             hadir++;
           } else {
@@ -278,19 +433,21 @@ export default function AdminAttendance() {
 
     // Performa Unit Kerja
     const unitMap: Record<string, { total: number, hadir: number }> = {};
+    const expectedWorkDays = dates.filter(d => new Date(d).getDay() !== 0).length; // Exclude Sundays for a more accurate total
+    
     employees.forEach(emp => {
-      const unit = typeof emp.location === 'object' && emp.location !== null ? emp.location.address || JSON.stringify(emp.location) : emp.location || 'Lainnya';
+      const unit = emp.unit || 'Lainnya';
       if (!unitMap[unit]) unitMap[unit] = { total: 0, hadir: 0 };
       
       const empAtt = filteredAttendance.filter(a => a.nip === emp.nip && a.type === 'in');
-      unitMap[unit].total += dates.length; // Assuming they should be present every day in the filtered range
+      unitMap[unit].total += expectedWorkDays;
       unitMap[unit].hadir += empAtt.length;
     });
 
     const performaUnitData = Object.keys(unitMap).map(unit => ({
       name: unit,
-      rate: unitMap[unit].total > 0 ? Math.round((unitMap[unit].hadir / unitMap[unit].total) * 100) : 0
-    })).sort((a, b) => b.rate - a.rate).slice(0, 6); // Top 6
+      rate: unitMap[unit].total > 0 ? Math.min(100, Math.round((unitMap[unit].hadir / unitMap[unit].total) * 100)) : 0
+    })).sort((a, b) => b.rate - a.rate).slice(0, 7); // Top 7
 
     // Distribusi Status Kehadiran (Group by Week)
     const weeks = [
@@ -324,7 +481,8 @@ export default function AdminAttendance() {
       filteredAttendance.forEach(a => {
         if (week.dates.includes(a.date) && a.type === 'in') {
           const t = parseTime(a.time);
-          const shift = getShiftForTime(t);
+          const empUnit = employees.find(e => e.nip === a.nip)?.unit;
+          const shift = getShiftForTime(t, empUnit);
           
           if (t > shift.start + shift.tolerance) {
             let lateMinutes = t - shift.start;
@@ -359,7 +517,8 @@ export default function AdminAttendance() {
       if (!empStats[a.nip]) return;
       
       const t = parseTime(a.time);
-      const shift = getShiftForTime(t);
+      const empUnit = employees.find(e => e.nip === a.nip)?.unit;
+      const shift = getShiftForTime(t, empUnit);
 
       if (a.type === 'in') {
         empStats[a.nip].inTimes.push(t - shift.start); // store difference for early birds
@@ -681,7 +840,14 @@ export default function AdminAttendance() {
     displayBulanan.forEach((emp) => {
       const rowData = [emp.nama, emp.nip, emp.totalHours];
       dates.forEach(date => {
-        rowData.push(emp.attendance[date as keyof typeof emp.attendance] || '-');
+        const attInfo = emp.attendance[date as keyof typeof emp.attendance];
+        if (typeof attInfo === 'string') {
+           rowData.push(attInfo || '-');
+        } else if (attInfo) {
+           rowData.push((attInfo as any).code || '-');
+        } else {
+           rowData.push('-');
+        }
       });
       const row = worksheet.addRow(rowData);
       
@@ -864,10 +1030,17 @@ export default function AdminAttendance() {
                         <TableCell className="sticky left-[150px] bg-white z-10 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{emp.nip}</TableCell>
                         <TableCell className="sticky left-[250px] bg-white z-10 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{emp.totalHours}</TableCell>
                         {dates.map(date => {
-                          const status = emp.attendance[date as keyof typeof emp.attendance] || '-';
+                          let attInfo = emp.attendance[date as keyof typeof emp.attendance];
+                          if (typeof attInfo === 'string') {
+                            attInfo = { code: attInfo, hours: 0, onlyIn: false, bgColor: '' };
+                          } else if (!attInfo) {
+                            attInfo = { code: '-', hours: 0, onlyIn: false, bgColor: '' };
+                          }
+                          const { code, bgColor, onlyIn } = attInfo;
+                          
                           return (
-                            <TableCell key={date} className="text-center px-2 border-r">
-                               <span className={getStatusColor(status)}>{status}</span>
+                            <TableCell key={date} className={`text-center px-2 border-r ${bgColor || ''} ${onlyIn ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}>
+                               <span className={getStatusColor(code)}>{code}</span>
                             </TableCell>
                           );
                         })}
@@ -1026,11 +1199,19 @@ export default function AdminAttendance() {
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={performaUnitData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                          <defs>
+                            <linearGradient id="colorRate" x1="0" y1="0" x2="1" y2="0">
+                              <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                              <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                            </linearGradient>
+                          </defs>
                           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                           <XAxis type="number" domain={[0, 100]} stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                          <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} width={80} />
-                          <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                          <Bar dataKey="rate" name="Tingkat Kehadiran (%)" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                          <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} width={90} />
+                          <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                          <Bar dataKey="rate" name="Tingkat Kehadiran (%)" fill="url(#colorRate)" radius={[0, 4, 4, 0]} barSize={24}>
+                            <LabelList dataKey="rate" position="right" fontSize={11} fill="#64748b" formatter={(value: number) => `${value}%`} />
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </div>

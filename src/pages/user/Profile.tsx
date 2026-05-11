@@ -257,16 +257,28 @@ export default function UserProfile() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Kantor / Penempatan</p>
-            <p className="font-medium">{employeeData?.office || 'Instansi Induk'}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Kantor / Penempatan 1</p>
+            <p className="font-medium">{employeeData?.office || user.office || 'Puskesmas Induk'}</p>
           </div>
+          {(employeeData?.office2 || user.office2) && (
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Kantor / Penempatan 2</p>
+              <p className="font-medium">{employeeData?.office2 || user.office2}</p>
+            </div>
+          )}
+          {(employeeData?.office3 || user.office3) && (
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Kantor / Penempatan 3</p>
+              <p className="font-medium">{employeeData?.office3 || user.office3}</p>
+            </div>
+          )}
           <div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Unit</p>
             <p className="font-medium">{employeeData?.unit || '-'}</p>
           </div>
           <div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Email</p>
-            <p className="font-medium">{employeeData?.email || user.email || 'pegawai@instansi.com'}</p>
+            <p className="font-medium">{employeeData?.email || user.email || 'pegawai@puskesmas.com'}</p>
           </div>
         </CardContent>
       </Card>

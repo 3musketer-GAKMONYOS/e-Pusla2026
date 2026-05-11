@@ -17,31 +17,25 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  // Simple Request Logger
-  app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-  });
-
   // Mock Database (In-Memory for Prototype)
   const db = {
     users: [
-      { id: 1, nip: '000000', name: 'Admin User', email: 'admin@instansi.com', role: 'admin', password: 'password', office: 'Kantor Induk', group: 'Superadmin' },
-      { id: 2, nip: '111111', name: 'Regular User', email: 'user@instansi.com', role: 'user', password: 'password', office: 'Pustu A' },
+      { id: 1, nip: '123456', name: 'Admin User', email: 'admin@puskesmas.com', role: 'admin', password: 'password', office: 'Kantor Induk', group: 'Superadmin' },
+      { id: 2, nip: '654321', name: 'Regular User', email: 'user@puskesmas.com', role: 'user', password: 'password', office: 'Pustu A' },
     ],
     employees: [
-      { id: '1', name: 'Admin User', nip: '000000', office: 'Kantor Induk', email: 'admin@instansi.com', gender: 'Laki-laki', cluster: 'Klaster 1', unit: 'Manajemen' },
-      { id: '2', name: 'Regular User', nip: '111111', office: 'Pustu A', email: 'user@instansi.com', gender: 'Perempuan', cluster: 'Klaster 2', unit: 'Pustu' }
+      { id: '1', name: 'Admin User', nip: '123456', office: 'Kantor Induk', email: 'admin@puskesmas.com', gender: 'Laki-laki', cluster: 'Klaster 1', unit: 'Manajemen' },
+      { id: '2', name: 'Regular User', nip: '654321', office: 'Pustu A', email: 'user@puskesmas.com', gender: 'Perempuan', cluster: 'Klaster 2', unit: 'Pustu' }
     ],
     attendance: [],
     locations: [
       { id: 1, name: 'Kantor Induk', lat: -7.250445, lng: 112.768845, radius: 300 },
     ],
     settings: {
-      appName: 'e-Pusla App',
-      companyName: 'Instansi Lamongan',
-      headName: 'Dr. Moh. Mahzumi',
-      address: 'Jl. Veteran',
+      appName: 'Si Abon Eiite App',
+      companyName: 'Puskesmas Sehat',
+      headName: 'Dr. Budi Santoso',
+      address: 'Jl. Kesehatan No. 1, Kota Sehat',
       mainLocation: '-7.250445, 112.768845',
       tolerance: 15,
     }
@@ -54,37 +48,34 @@ async function startServer() {
   // Cache for spreadsheet data
   const cache: { [key: string]: { data: any; timestamp: number } } = {};
   const CACHE_DURATION = 60 * 1000; // 1 minute cache
-
   async function initSpreadsheet() {
-    if (process.env.SPREADSHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-      try {
-        let privateKey = process.env.GOOGLE_PRIVATE_KEY;
-        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-          privateKey = privateKey.substring(1, privateKey.length - 1);
-        }
-        privateKey = privateKey.replace(/\\n/g, '\n');
-        
-        console.log('Attempting to connect to Google Sheets...');
-        const serviceAccountAuth = new JWT({
-          email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-          key: privateKey,
-          scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-        });
-        doc = new GoogleSpreadsheet(process.env.SPREADSHEET_ID, serviceAccountAuth);
-        await doc.loadInfo();
-        isDocLoaded = true;
-        console.log('Google Spreadsheet connected successfully:', doc.title);
-      } catch (error) {
-        console.error('Failed to connect to Google Spreadsheet:', error);
-        doc = null;
+  if (process.env.SPREADSHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+    try {
+      let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+        privateKey = privateKey.substring(1, privateKey.length - 1);
       }
-    } else {
-      console.warn('Google Sheets environment variables are missing.');
+      privateKey = privateKey.replace(/\\n/g, '\n');
+      
+      console.log('Attempting to connect to Google Sheets...');
+      const serviceAccountAuth = new JWT({
+        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        key: privateKey,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+      doc = new GoogleSpreadsheet(process.env.SPREADSHEET_ID, serviceAccountAuth);
+      await doc.loadInfo();
+      isDocLoaded = true;
+      console.log('Google Spreadsheet connected successfully:', doc.title);
+    } catch (error) {
+      console.error('Failed to connect to Google Spreadsheet:', error);
+      doc = null;
     }
+  } else {
+    console.warn('Google Sheets environment variables are missing.');
   }
-
-  // Start initialization in background
-  initSpreadsheet();
+}
+initSpreadsheet();
 
   // Helper to get or create sheet
   async function getSheet(title: string) {
@@ -98,12 +89,7 @@ async function startServer() {
         await doc.loadInfo();
         isDocLoaded = true;
       }
-      let sheet = doc.sheetsByTitle[title];
-      if (!sheet) {
-        // Reload in case it was created manually or by another process
-        await doc.loadInfo();
-        sheet = doc.sheetsByTitle[title];
-      }
+      const sheet = doc.sheetsByTitle[title];
       if (!sheet) {
         console.error(`Sheet '${title}' not found in spreadsheet.`);
         return null;
@@ -196,7 +182,6 @@ async function startServer() {
         }
       } catch (error) {
         console.error('Error saving employee to spreadsheet:', error);
-        return res.status(500).json({ success: false, message: 'GoogleAPIError: ' + String(error) });
       }
     } else {
       db.employees.push(employee);
@@ -457,7 +442,7 @@ async function startServer() {
             const rows = await userSheet.getRows();
             const row = rows.find(r => String(r.get('nip') || '').trim() === nip && String(r.get('password') || '').trim() === password);
             if (row) {
-              user = { id: row.get('id'), nip: String(row.get('nip') || '').trim(), name: row.get('name'), role: row.get('role'), office: row.get('office'), office2: row.get('office2'), office3: row.get('office3'), unit: row.get('unit') };
+              user = { id: row.get('id'), nip: String(row.get('nip') || '').trim(), name: row.get('name'), role: row.get('role'), office: row.get('office'), office2: row.get('office2'), office3: row.get('office3'), unit: row.get('unit') || '' };
               console.log('User found:', user.name);
             }
           }
@@ -483,13 +468,13 @@ async function startServer() {
             if (deviceSheet) {
               const rows = await deviceSheet.getRows();
               const existingDeviceRow = rows.find(r => r.get('deviceId') === deviceId);
-              if (existingDeviceRow && existingDeviceRow.get('nip') !== nip) {
+              if (existingDeviceRow && String(existingDeviceRow.get('nip')) !== String(nip)) {
                 return res.status(403).json({ success: false, message: 'Perangkat ini sudah digunakan oleh akun lain. Silahkan hubungi Admin untuk mereset perangkat jika fitur ini bermasalah.' });
               }
 
-              const existingNipRow = rows.find(r => r.get('nip') === nip);
+              const existingNipRow = rows.find(r => String(r.get('nip')) === String(nip));
               if (existingNipRow && existingNipRow.get('deviceId') !== deviceId) {
-                return res.status(403).json({ success: false, message: 'Akun Anda sudah terdaftar di perangkat lain (atau cache browser telah dihapus). Silahkan hubungi Admin untuk mereset perangkat dari menu Karyawan.' });
+                return res.status(403).json({ success: false, message: 'Akun Anda terdaftar di perangkat lain. Untuk pengguna iOS/iPhone yang baru menginstall ke Layar Utama, layar utama dianggap sebagai perangkat baru. Silahkan minta Admin untuk mereset perangkat Anda di menu Karyawan.' });
               }
 
               if (!existingDeviceRow && !existingNipRow) {
@@ -557,24 +542,31 @@ async function startServer() {
   // --- API to Reset Device Binding ---
   app.delete('/api/device-bindings/:nip', async (req, res) => {
     const { nip } = req.params;
+    console.log(`[DELETE /api/device-bindings/${nip}] Requested`);
     if (doc) {
       try {
         const deviceSheet = await getSheet('DeviceBindings');
         if (deviceSheet) {
           const rows = await deviceSheet.getRows();
-          const existingNipRow = rows.find(r => r.get('nip') === nip);
+          const existingNipRow = rows.find(r => String(r.get('nip')) === String(nip));
           if (existingNipRow) {
             await existingNipRow.delete();
+            console.log(`[DELETE /api/device-bindings/${nip}] Success`);
             return res.json({ success: true, message: 'Binding perangkat berhasil dihapus.' });
           } else {
-            return res.status(404).json({ success: false, message: 'Binding perangkat tidak ditemukan.' });
+            console.log(`[DELETE /api/device-bindings/${nip}] Not found in rows, assuming already clean`);
+            return res.json({ success: true, message: 'Binding perangkat sudah kosong/tidak ada binding.' });
           }
+        } else {
+          console.log(`[DELETE /api/device-bindings/${nip}] DeviceBindings sheet not found`);
+          return res.json({ success: true, message: 'Binding perangkat sudah kosong/tidak ada binding.' });
         }
       } catch (error) {
         console.error('Error resetting device binding:', error);
         return res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server.' });
       }
     }
+    console.log(`[DELETE /api/device-bindings/${nip}] Doc not loaded`);
     return res.status(500).json({ success: false, message: 'Spreadsheet tidak terkonfigurasi.' });
   });
 
@@ -641,13 +633,12 @@ async function startServer() {
     // Save to Google Spreadsheet if configured
     if (doc) {
       try {
-        const sheet = await getOrCreateSheet('Users', ['id', 'nip', 'name', 'email', 'role', 'password', 'gender', 'cluster', 'unit', 'office', 'office2', 'office3']);
+        const sheet = await getOrCreateSheet('Users', ['id', 'nip', 'name', 'email', 'role', 'password', 'gender', 'cluster', 'unit', 'office', 'office2']);
         if (sheet) {
           await sheet.addRow(newUser);
         }
       } catch (error) {
         console.error('Error saving user to spreadsheet:', error);
-        return res.status(500).json({ success: false, message: 'GoogleAPIError: ' + String(error) });
       }
     } else {
       db.users.push(newUser as any);
@@ -852,9 +843,9 @@ async function startServer() {
     if (resend) {
       try {
         await resend.emails.send({
-          from: 'e-Pusla <onboarding@resend.dev>',
+          from: 'Si Abon Megilan <onboarding@resend.dev>',
           to: foundUser.email,
-          subject: 'Reset Password - e-Pusla',
+          subject: 'Reset Password - Si Abon Megilan',
           html: `<p>Halo ${foundUser.name},</p><p>Klik tautan berikut untuk mereset password Anda:</p><p><a href="${resetLink}">${resetLink}</a></p><p>Tautan ini akan kedaluwarsa dalam 1 jam.</p>`,
         });
       } catch (error) {
@@ -1071,7 +1062,7 @@ async function startServer() {
         if (cache['shifts'] && Date.now() - cache['shifts'].timestamp < CACHE_DURATION) {
           return res.json(cache['shifts'].data);
         }
-        const sheet = await getOrCreateSheet('Shifts', ['id', 'name', 'startTime', 'endTime', 'crossesMidnight', 'isActive', 'unit', 'checkInDispensationBefore', 'checkInDispensationAfter', 'checkOutDispensationBefore', 'checkOutDispensationAfter', 'fridayEndTime', 'saturdayEndTime']);
+        const sheet = await getOrCreateSheet('Shifts', ['id', 'name', 'startTime', 'endTime', 'fridayEndTime', 'saturdayEndTime', 'checkInBeforeMinutes', 'checkInAfterMinutes', 'checkOutBeforeMinutes', 'checkOutAfterMinutes', 'crossesMidnight', 'isActive', 'unit']);
         if (sheet) {
           const rows = await sheet.getRows();
           const shifts = rows.map(row => ({
@@ -1079,15 +1070,15 @@ async function startServer() {
             name: row.get('name'),
             startTime: row.get('startTime'),
             endTime: row.get('endTime'),
+            fridayEndTime: row.get('fridayEndTime') || '',
+            saturdayEndTime: row.get('saturdayEndTime') || '',
+            checkInBeforeMinutes: parseInt(row.get('checkInBeforeMinutes') || '60'),
+            checkInAfterMinutes: parseInt(row.get('checkInAfterMinutes') || '15'),
+            checkOutBeforeMinutes: parseInt(row.get('checkOutBeforeMinutes') || '10'),
+            checkOutAfterMinutes: parseInt(row.get('checkOutAfterMinutes') || '120'),
             crossesMidnight: String(row.get('crossesMidnight')).toLowerCase() === 'true',
             isActive: String(row.get('isActive')).toLowerCase() === 'true',
-            unit: row.get('unit') || '',
-            checkInDispensationBefore: row.get('checkInDispensationBefore') ? parseInt(row.get('checkInDispensationBefore')) : 60,
-            checkInDispensationAfter: row.get('checkInDispensationAfter') ? parseInt(row.get('checkInDispensationAfter')) : 60,
-            checkOutDispensationBefore: row.get('checkOutDispensationBefore') ? parseInt(row.get('checkOutDispensationBefore')) : 10,
-            checkOutDispensationAfter: row.get('checkOutDispensationAfter') ? parseInt(row.get('checkOutDispensationAfter')) : 120,
-            fridayEndTime: row.get('fridayEndTime') || '',
-            saturdayEndTime: row.get('saturdayEndTime') || ''
+            unit: row.get('unit') || ''
           }));
           cache['shifts'] = { timestamp: Date.now(), data: shifts };
           return res.json(shifts);
@@ -1097,8 +1088,8 @@ async function startServer() {
       }
     }
     res.json([
-      { id: "1", name: "Pagi", startTime: "08:00", endTime: "16:00", crossesMidnight: false, isActive: true },
-      { id: "2", name: "Malam", startTime: "20:00", endTime: "04:00", crossesMidnight: true, isActive: true }
+      { id: "1", name: "Pagi", startTime: "08:00", endTime: "16:00", fridayEndTime: "10:50", saturdayEndTime: "12:30", checkInBeforeMinutes: 60, checkInAfterMinutes: 15, checkOutBeforeMinutes: 10, checkOutAfterMinutes: 120, crossesMidnight: false, isActive: true, unit: "" },
+      { id: "2", name: "Malam", startTime: "20:00", endTime: "04:00", fridayEndTime: "", saturdayEndTime: "", checkInBeforeMinutes: 60, checkInAfterMinutes: 15, checkOutBeforeMinutes: 10, checkOutAfterMinutes: 120, crossesMidnight: true, isActive: true, unit: "" }
     ]);
   });
 
@@ -1106,19 +1097,17 @@ async function startServer() {
     const shift = req.body;
     if (doc) {
       try {
-        const sheet = await getOrCreateSheet('Shifts', ['id', 'name', 'startTime', 'endTime', 'crossesMidnight', 'isActive', 'unit', 'checkInDispensationBefore', 'checkInDispensationAfter', 'checkOutDispensationBefore', 'checkOutDispensationAfter', 'fridayEndTime', 'saturdayEndTime']);
+        const sheet = await getOrCreateSheet('Shifts', ['id', 'name', 'startTime', 'endTime', 'fridayEndTime', 'saturdayEndTime', 'checkInBeforeMinutes', 'checkInAfterMinutes', 'checkOutBeforeMinutes', 'checkOutAfterMinutes', 'crossesMidnight', 'isActive', 'unit']);
         if (sheet) {
           await sheet.addRow({
             ...shift,
+            checkInBeforeMinutes: (shift.checkInBeforeMinutes || 60).toString(),
+            checkInAfterMinutes: (shift.checkInAfterMinutes || 15).toString(),
+            checkOutBeforeMinutes: (shift.checkOutBeforeMinutes || 10).toString(),
+            checkOutAfterMinutes: (shift.checkOutAfterMinutes || 120).toString(),
             crossesMidnight: shift.crossesMidnight.toString(),
             isActive: shift.isActive.toString(),
-            unit: shift.unit || '',
-            checkInDispensationBefore: shift.checkInDispensationBefore?.toString() || '60',
-            checkInDispensationAfter: shift.checkInDispensationAfter?.toString() || '60',
-            checkOutDispensationBefore: shift.checkOutDispensationBefore?.toString() || '10',
-            checkOutDispensationAfter: shift.checkOutDispensationAfter?.toString() || '120',
-            fridayEndTime: shift.fridayEndTime || '',
-            saturdayEndTime: shift.saturdayEndTime || ''
+            unit: shift.unit || ''
           });
           delete cache['shifts'];
         }
@@ -1162,15 +1151,15 @@ async function startServer() {
             rowToUpdate.set('name', shift.name);
             rowToUpdate.set('startTime', shift.startTime);
             rowToUpdate.set('endTime', shift.endTime);
+            rowToUpdate.set('fridayEndTime', shift.fridayEndTime || '');
+            rowToUpdate.set('saturdayEndTime', shift.saturdayEndTime || '');
+            rowToUpdate.set('checkInBeforeMinutes', (shift.checkInBeforeMinutes || 60).toString());
+            rowToUpdate.set('checkInAfterMinutes', (shift.checkInAfterMinutes || 15).toString());
+            rowToUpdate.set('checkOutBeforeMinutes', (shift.checkOutBeforeMinutes || 10).toString());
+            rowToUpdate.set('checkOutAfterMinutes', (shift.checkOutAfterMinutes || 120).toString());
             rowToUpdate.set('crossesMidnight', shift.crossesMidnight.toString());
             rowToUpdate.set('isActive', shift.isActive.toString());
             rowToUpdate.set('unit', shift.unit || '');
-            rowToUpdate.set('checkInDispensationBefore', shift.checkInDispensationBefore?.toString() || '60');
-            rowToUpdate.set('checkInDispensationAfter', shift.checkInDispensationAfter?.toString() || '60');
-            rowToUpdate.set('checkOutDispensationBefore', shift.checkOutDispensationBefore?.toString() || '10');
-            rowToUpdate.set('checkOutDispensationAfter', shift.checkOutDispensationAfter?.toString() || '120');
-            rowToUpdate.set('fridayEndTime', shift.fridayEndTime || '');
-            rowToUpdate.set('saturdayEndTime', shift.saturdayEndTime || '');
             await rowToUpdate.save();
             delete cache['shifts'];
           }
