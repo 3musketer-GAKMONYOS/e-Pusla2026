@@ -20,8 +20,8 @@ export default defineConfig(({mode}) => {
           enabled: true
         },
         manifest: {
-          name: 'Si Abon Elite App',
-          short_name: 'Si Abon',
+          name: 'e-Pusla App',
+          short_name: 'e-Pusla',
           theme_color: '#14b8a6',
           display: 'standalone',
           start_url: '/',
@@ -29,12 +29,14 @@ export default defineConfig(({mode}) => {
             {
               src: '/logo.png',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/png',
+              purpose: 'any maskable'
             },
             {
               src: '/logo.png',
               sizes: '512x512',
-              type: 'image/png'
+              type: 'image/png',
+              purpose: 'any maskable'
             }
           ]
         }
