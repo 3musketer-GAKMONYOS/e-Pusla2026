@@ -191,7 +191,18 @@ export default function AdminAttendance() {
           const isLeave = ['izin', 'sakit', 'Cuti', 'dinas_luar', 'pending'].includes(record.type) || ['izin', 'Sakit', 'Cuti', 'Dinas Luar', 'pending'].includes(record.status);
           
           if (isLeave) {
-              if (record.date === todayStr) {
+              const recDate = new Date(record.date);
+              const targetDate = new Date(todayStr);
+              recDate.setHours(0, 0, 0, 0);
+              targetDate.setHours(0, 0, 0, 0);
+              
+              let endDate = new Date(recDate);
+              if (typeof record.location === 'object' && record.location !== null && record.location.endDate) {
+                endDate = new Date(record.location.endDate);
+                endDate.setHours(0, 0, 0, 0);
+              }
+              
+              if (targetDate >= recDate && targetDate <= endDate) {
                   processedHarianRaw.push({ inRecord: null, outRecord: null, leaveRecord: record });
               }
           } else if (record.type === 'in') {
@@ -282,15 +293,76 @@ export default function AdminAttendance() {
       
       const inRecord = recordsForDate.find(a => a.type === 'in');
       let outRecord = recordsForDate.find(a => a.type === 'out');
-      const leaveRecord = recordsForDate.find(a => ['izin', 'sakit', 'Cuti', 'dinas_luar', 'pending'].includes(a.type) || ['izin', 'Sakit', 'Cuti', 'Dinas Luar', 'pending'].includes(a.status));
+      const leaveRecord = empAttendance.find(a => {
+        const isLeaveType = ['izin', 'sakit', 'Cuti', 'dinas_luar', 'pending'].includes(a.type) || ['izin', 'Sakit', 'Cuti', 'Dinas Luar', 'pending'].includes(a.status);
+        if (!isLeaveType) return false;
+        
+        const recDate = new Date(a.date);
+        const targetDate = new Date(date);
+        recDate.setHours(0, 0, 0, 0);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        let endDate = new Date(recDate);
+        if (typeof a.location === 'object' && a.location !== null && a.location.endDate) {
+          endDate = new Date(a.location.endDate);
+          endDate.setHours(0, 0, 0, 0);
+        }
+        
+        return targetDate >= recDate && targetDate <= endDate;
+      });
 
       if (leaveRecord) {
+        // Evaluate consecutive days for 'sakit' or 'dinas_luar'
+        const isSakit = leaveRecord.status === 'Sakit' || leaveRecord.type === 'sakit';
+        const isDinasLuar = leaveRecord.status === 'Dinas Luar' || leaveRecord.type === 'dinas_luar';
+        
+        let shouldGiveHours = false;
+        if (isSakit || isDinasLuar) {
+          let consecutiveCount = 0;
+          let checkDate = new Date(date);
+          checkDate.setHours(0, 0, 0, 0);
+          
+          while (true) {
+            const hasSameLeave = empAttendance.some(a => {
+               const matchesType = (isSakit && (a.status === 'Sakit' || a.type === 'sakit')) ||
+                                   (isDinasLuar && (a.status === 'Dinas Luar' || a.type === 'dinas_luar'));
+               if (!matchesType) return false;
+               const rDate = new Date(a.date);
+               rDate.setHours(0, 0, 0, 0);
+               let eDate = new Date(rDate);
+               if (typeof a.location === 'object' && a.location !== null && a.location.endDate) {
+                 eDate = new Date(a.location.endDate);
+                 eDate.setHours(0, 0, 0, 0);
+               }
+               return checkDate >= rDate && checkDate <= eDate;
+            });
+            if (hasSameLeave) {
+               consecutiveCount++;
+               checkDate.setDate(checkDate.getDate() - 1);
+            } else {
+               break;
+            }
+          }
+          if (consecutiveCount <= 3) {
+             shouldGiveHours = true;
+          }
+        }
+
         if (leaveRecord.status === 'izin' || leaveRecord.type === 'izin') statusInfo.code = 'I';
-        else if (leaveRecord.status === 'Sakit' || leaveRecord.type === 'sakit') statusInfo.code = 'S';
+        else if (isSakit) {
+          statusInfo.code = 'S';
+          if (shouldGiveHours) {
+            statusInfo.hours = Number((6 + 25/60).toFixed(2));
+          }
+        }
         else if (leaveRecord.status === 'Cuti' || leaveRecord.type === 'Cuti') statusInfo.code = 'C';
-        else if (leaveRecord.status === 'Dinas Luar' || leaveRecord.type === 'dinas_luar') {
+        else if (isDinasLuar) {
           statusInfo.code = 'D';
-          statusInfo.hours = 7;
+          if (shouldGiveHours) {
+            statusInfo.hours = Number((6 + 25/60).toFixed(2));
+          } else {
+            statusInfo.hours = 0;
+          }
         }
         else if (leaveRecord.status === 'pending') statusInfo.code = 'P';
         else statusInfo.code = leaveRecord.status?.[0] || 'M';

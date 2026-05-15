@@ -28,7 +28,19 @@ export default function UserHistory() {
   }, [user.nip]);
 
   const selectedDateString = date ? format(date, 'yyyy-MM-dd') : '';
-  const dayAttendance = attendanceData.filter(a => a.date === selectedDateString || (typeof a.location === 'object' && a.location !== null && a.location.endDate && new Date(a.date) <= date! && new Date(a.location.endDate) >= date!));
+  const dayAttendance = attendanceData.filter(a => {
+    if (a.date === selectedDateString) return true;
+    if (typeof a.location === 'object' && a.location !== null && a.location.endDate && date) {
+      const recDate = new Date(a.date);
+      const targetDate = new Date(date);
+      const endDate = new Date(a.location.endDate);
+      recDate.setHours(0, 0, 0, 0);
+      targetDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+      return targetDate >= recDate && targetDate <= endDate;
+    }
+    return false;
+  });
   
   const inRecord = dayAttendance.find(a => a.type === 'in');
   const outRecord = dayAttendance.find(a => a.type === 'out');

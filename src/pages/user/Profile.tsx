@@ -19,6 +19,9 @@ export default function UserProfile() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [employeeData, setEmployeeData] = useState<any>(null);
   const [alarmEnabled, setAlarmEnabled] = useState(localStorage.getItem('alarmEnabled') !== 'false');
+  const [alarmBeforeMins, setAlarmBeforeMins] = useState(localStorage.getItem('alarmBeforeMins') || '10');
+  const [alarmAfterMins, setAlarmAfterMins] = useState(localStorage.getItem('alarmAfterMins') || '15');
+  const [alarmCheckoutMins, setAlarmCheckoutMins] = useState(localStorage.getItem('alarmCheckoutMins') || '0');
 
   // Password change state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -240,14 +243,61 @@ export default function UserProfile() {
         <CardHeader>
           <CardTitle className="text-lg">Pengaturan Aplikasi</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-slate-900 dark:text-slate-50">Alarm Pengingat Absensi</Label>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Pengingat 10 mnt sebelum & 15 mnt sesudah shift</p>
+              <Label className="text-slate-900 dark:text-slate-50 text-base">Aktifkan Alarm Absensi</Label>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Terima notifikasi untuk absen masuk dan pulang</p>
             </div>
             <Switch checked={alarmEnabled} onCheckedChange={handleToggleAlarm} />
           </div>
+
+          {alarmEnabled && (
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <div className="grid grid-cols-2 gap-4 items-center">
+                <Label htmlFor="alarmBefore" className="text-sm">Menit sebelum absen masuk</Label>
+                <Input 
+                  id="alarmBefore" 
+                  type="number" 
+                  min="0"
+                  value={alarmBeforeMins} 
+                  onChange={(e) => {
+                    setAlarmBeforeMins(e.target.value);
+                    localStorage.setItem('alarmBeforeMins', e.target.value);
+                  }}
+                  className="h-9"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4 items-center">
+                <Label htmlFor="alarmAfter" className="text-sm">Menit peringatan terlambat</Label>
+                <Input 
+                  id="alarmAfter" 
+                  type="number" 
+                  min="0"
+                  value={alarmAfterMins} 
+                  onChange={(e) => {
+                    setAlarmAfterMins(e.target.value);
+                    localStorage.setItem('alarmAfterMins', e.target.value);
+                  }}
+                  className="h-9"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4 items-center">
+                <Label htmlFor="alarmCheckout" className="text-sm">Menit sesudah waktu pulang (Pengingat Pulang)</Label>
+                <Input 
+                  id="alarmCheckout" 
+                  type="number" 
+                  min="0"
+                  value={alarmCheckoutMins} 
+                  onChange={(e) => {
+                    setAlarmCheckoutMins(e.target.value);
+                    localStorage.setItem('alarmCheckoutMins', e.target.value);
+                  }}
+                  className="h-9"
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

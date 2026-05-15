@@ -110,7 +110,22 @@ export default function UserHome() {
             }
           }
 
-          const userAttToday = data.filter((a: any) => a.nip === nipToCheck && a.date === today);
+          const userAttToday = data.filter((a: any) => {
+            if (a.nip !== nipToCheck) return false;
+            if (a.date === today) return true;
+            if (['izin', 'sakit', 'Cuti', 'dinas_luar', 'pending'].includes(a.type) || ['izin', 'Sakit', 'Cuti', 'Dinas Luar', 'pending'].includes(a.status)) {
+              if (typeof a.location === 'object' && a.location !== null && a.location.endDate) {
+                 const recDate = new Date(a.date);
+                 const targetDate = new Date(today);
+                 const endDate = new Date(a.location.endDate);
+                 recDate.setHours(0, 0, 0, 0);
+                 targetDate.setHours(0, 0, 0, 0);
+                 endDate.setHours(0, 0, 0, 0);
+                 return targetDate >= recDate && targetDate <= endDate;
+              }
+            }
+            return false;
+          });
           const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
           const userAttYesterday = data.filter((a: any) => a.nip === nipToCheck && a.date === yesterday);
           
@@ -302,23 +317,25 @@ export default function UserHome() {
           
           // Alarm logic
           const diffMsStart = upcomingShiftStart.getTime() - now.getTime();
-          if (diffMsStart <= 10 * 60000 && diffMsStart > 9 * 60000) {
+          
+          const alarmBeforeStr = localStorage.getItem('alarmBeforeMins');
+          const alarmBefore = alarmBeforeStr ? parseInt(alarmBeforeStr, 10) : 10;
+          if (alarmBefore >= 0 && diffMsStart <= alarmBefore * 60000 && diffMsStart > (alarmBefore - 1) * 60000) {
             checkAndFireAlarm(
-              'Pengingat Absensi', 
-              'Shift Anda akan mulai dalam 10 menit. Jangan lupa absen masuk!', 
-              'masuk_10'
+              'Pengingat Absensi Masuk', 
+              `Shift Anda akan mulai dalam ${alarmBefore} menit. Jangan lupa absen masuk!`, 
+              `masuk_${alarmBefore}`
             );
           }
 
-          if (diffMsStart <= -15 * 60000 && diffMsStart > -16 * 60000 && !hasCheckedIn) {
-            const day = now.getDay();
-            if (day >= 1 && day <= 5) {
-              checkAndFireAlarm(
-                'Peringatan Keterlambatan', 
-                'Anda belum absen masuk dan shift sudah berjalan 15 menit!', 
-                'telat_15'
-              );
-            }
+          const alarmAfterStr = localStorage.getItem('alarmAfterMins');
+          const alarmAfter = alarmAfterStr ? parseInt(alarmAfterStr, 10) : 15;
+          if (alarmAfter >= 0 && diffMsStart <= -alarmAfter * 60000 && diffMsStart > -(alarmAfter + 1) * 60000 && !hasCheckedIn) {
+            checkAndFireAlarm(
+              'Peringatan Keterlambatan', 
+              `Anda belum absen masuk dan shift sudah berjalan ${alarmAfter} menit!`, 
+              `telat_${alarmAfter}`
+            );
           }
 
           // Izinkan absen masuk mulai X menit sebelum shift dimulai
@@ -407,6 +424,20 @@ export default function UserHome() {
         }
         
         const diff = shiftEnd.getTime() - now.getTime();
+        
+        // Checkout alarm logic
+        const alarmCheckoutStr = localStorage.getItem('alarmCheckoutMins');
+        const alarmCheckout = alarmCheckoutStr ? parseInt(alarmCheckoutStr, 10) : 0;
+        if (alarmCheckout >= 0 && diff <= -alarmCheckout * 60000 && diff > -(alarmCheckout + 1) * 60000 && !hasCheckedOut && hasCheckedIn) {
+          const bodyTxt = alarmCheckout === 0 
+            ? `Waktu shift Anda telah selesai. Jangan lupa absen pulang!` 
+            : `Waktu pulang sudah lewat ${alarmCheckout} menit. Jangan lupa absen pulang!`;
+          checkAndFireAlarm(
+            'Pengingat Absensi Pulang',
+            bodyTxt,
+            `pulang_${alarmCheckout}`
+          );
+        }
         
         if (diff > 0) {
           const hours = Math.floor(diff / (1000 * 60 * 60));
