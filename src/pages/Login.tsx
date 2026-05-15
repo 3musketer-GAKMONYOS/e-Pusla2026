@@ -32,6 +32,8 @@ export default function Login() {
   // Forgot password state
   const [forgotEmail, setForgotEmail] = useState('');
 
+  const [units, setUnits] = useState<{id: string, name: string}[]>([]);
+
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -73,6 +75,30 @@ export default function Login() {
       }
     };
     fetchSettings();
+
+    const fetchUnits = async () => {
+      try {
+        const response = await fetch('/api/units');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.length > 0) {
+            setUnits(data);
+          } else {
+            const savedUnits = localStorage.getItem('unitsData');
+            if (savedUnits) {
+              setUnits(JSON.parse(savedUnits));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch units:', error);
+        const savedUnits = localStorage.getItem('unitsData');
+        if (savedUnits) {
+          setUnits(JSON.parse(savedUnits));
+        }
+      }
+    };
+    fetchUnits();
   }, [navigate]);
 
   const generateDeviceId = async () => {
@@ -391,15 +417,9 @@ export default function Login() {
                   <SelectValue placeholder="Pilih Unit Kerja" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Manajemen">Manajemen</SelectItem>
-                  <SelectItem value="Rawat Jalan">Rawat Jalan</SelectItem>
-                  <SelectItem value="UGD/Rawat Inap">UGD/Rawat Inap</SelectItem>
-                  <SelectItem value="Poned">Poned</SelectItem>
-                  <SelectItem value="Pustu">Pustu</SelectItem>
-                  <SelectItem value="Polindes">Polindes</SelectItem>
-                  <SelectItem value="Ponkesdes">Ponkesdes</SelectItem>
-                  <SelectItem value="Armada">Armada</SelectItem>
-                  <SelectItem value="Kebersihan">Kebersihan</SelectItem>
+                  {units.map((unit) => (
+                    <SelectItem key={unit.id} value={unit.name}>{unit.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

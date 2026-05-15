@@ -31,6 +31,10 @@ async function startServer() {
     locations: [
       { id: 1, name: 'Kantor Induk', lat: -7.250445, lng: 112.768845, radius: 300 },
     ],
+    units: [
+      { id: '1', name: 'Manajemen' },
+      { id: '2', name: 'Pustu' }
+    ],
     settings: {
       appName: 'Si Abon Eiite App',
       companyName: 'Puskesmas Sehat',
@@ -1053,6 +1057,70 @@ initSpreadsheet();
       }
     }
     res.json({ success: true, message: 'Lokasi berhasil dihapus' });
+  });
+
+  // --- Units API ---
+  app.get('/api/units', async (req, res) => {
+    if (doc) {
+      try {
+        if (cache['units'] && Date.now() - cache['units'].timestamp < CACHE_DURATION) {
+          return res.json(cache['units'].data);
+        }
+        const sheet = await getOrCreateSheet('Units', ['id', 'name']);
+        if (sheet) {
+          const rows = await sheet.getRows();
+          const units = rows.map(row => ({
+            id: row.get('id'),
+            name: row.get('name')
+          }));
+          cache['units'] = { data: units, timestamp: Date.now() };
+          return res.json(units);
+        }
+      } catch (error) {
+        console.error('Error fetching units from spreadsheet:', error);
+      }
+    }
+    res.json(db.units);
+  });
+
+  app.post('/api/units', async (req, res) => {
+    const unit = req.body;
+    if (doc) {
+      try {
+        const sheet = await getOrCreateSheet('Units', ['id', 'name']);
+        if (sheet) {
+          await sheet.addRow(unit);
+          delete cache['units'];
+        }
+      } catch (error) {
+        console.error('Error saving unit to spreadsheet:', error);
+      }
+    } else {
+      db.units.push(unit);
+    }
+    res.json({ success: true, message: 'Unit Layanan berhasil ditambahkan' });
+  });
+
+  app.delete('/api/units/:id', async (req, res) => {
+    const { id } = req.params;
+    if (doc) {
+      try {
+        const sheet = await getSheet('Units');
+        if (sheet) {
+          const rows = await sheet.getRows();
+          const rowToDelete = rows.find(r => String(r.get('id')) === String(id));
+          if (rowToDelete) {
+            await rowToDelete.delete();
+            delete cache['units'];
+          }
+        }
+      } catch (error) {
+        console.error('Error deleting unit from spreadsheet:', error);
+      }
+    } else {
+      db.units = db.units.filter(u => u.id !== id);
+    }
+    res.json({ success: true, message: 'Unit Layanan berhasil dihapus' });
   });
 
   // --- Shifts API ---
