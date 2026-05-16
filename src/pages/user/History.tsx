@@ -1,10 +1,11 @@
+import { getServerTime } from '@/lib/time';
 import { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 
 export default function UserHistory() {
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<Date | undefined>(getServerTime());
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 

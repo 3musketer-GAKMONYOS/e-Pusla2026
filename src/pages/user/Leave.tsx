@@ -1,3 +1,4 @@
+import { getServerTime } from '@/lib/time';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -173,7 +174,7 @@ export default function UserLeave() {
           nip: user?.nip || 'N/A',
           name: user?.name || 'N/A',
           date: startDate,
-          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          time: getServerTime().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
           type: type,
           location: { lat, lng, reason, endDate }, 
           status: status,

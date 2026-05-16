@@ -1,3 +1,4 @@
+import { getServerTime } from '@/lib/time';
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -69,7 +70,7 @@ export default function AdminAttendance() {
   }, []);
 
   // State for Absensi Bulanan
-  const today = new Date();
+  const today = getServerTime();
   const firstDayOfMonth = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
   const lastDayOfMonth = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
   
@@ -148,7 +149,7 @@ export default function AdminAttendance() {
       }
     });
 
-    const now = new Date();
+    const now = getServerTime();
     const day = now.getDay();
     let endTimeStr = bestShift.endTime;
     if (day === 5 && bestShift.fridayEndTime) {
@@ -454,8 +455,8 @@ export default function AdminAttendance() {
   };
 
   // State for Analisa Data Filter
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState(getServerTime().getMonth().toString());
+  const [selectedYear, setSelectedYear] = useState(getServerTime().getFullYear().toString());
   
   const filteredAttendance = useMemo(() => {
     return attendanceData.filter(a => {
@@ -745,7 +746,7 @@ export default function AdminAttendance() {
         id: Date.now().toString(),
         title: newAnnouncementTitle,
         content: newAnnouncementContent,
-        date: new Date().toISOString().split('T')[0],
+        date: getServerTime().toISOString().split('T')[0],
         expiryDate: newAnnouncementExpiry,
         isActive: true
       };
@@ -884,7 +885,7 @@ export default function AdminAttendance() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Absensi_Harian_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+    a.download = `Absensi_Harian_${format(getServerTime(), 'yyyy-MM-dd')}.xlsx`;
     a.click();
     window.URL.revokeObjectURL(url);
   };

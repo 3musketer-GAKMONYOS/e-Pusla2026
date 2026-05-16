@@ -135,6 +135,11 @@ initSpreadsheet();
 
   // API Routes
 
+  // --- Time API (Server Time) ---
+  app.get('/api/time', (req, res) => {
+    res.json({ time: Date.now() });
+  });
+
   // --- Employees API ---
   app.get('/api/employees', async (req, res) => {
     if (doc) {
