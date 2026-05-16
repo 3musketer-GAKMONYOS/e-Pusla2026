@@ -63,6 +63,8 @@ export default function UserHome() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        await fetch('/api/attendance/auto-checkout-check').catch(() => {});
+        
         const [locRes, setRes, attRes, shiftRes, annRes, empRes] = await Promise.all([
           fetch('/api/locations'),
           fetch('/api/settings'),

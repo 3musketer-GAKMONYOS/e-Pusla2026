@@ -677,7 +677,9 @@ initSpreadsheet();
               try { return JSON.parse(row.get('location')); }
               catch (e) { return row.get('location'); }
             })(),
-            status: (row.get('type') === 'sakit' && (row.get('status') === 'izin' || row.get('status') === 'Izin')) ? 'Sakit' : row.get('status'),
+            status: (row.get('type') === 'sakit' && (row.get('status') === 'izin' || row.get('status') === 'Izin')) ? 'Sakit' : 
+                    (row.get('type') === 'dinas_luar' && (row.get('status') === 'izin' || row.get('status') === 'Izin')) ? 'Dinas Luar' : 
+                    row.get('status'),
             photoUrl: row.get('photoUrl')
           }));
           cache['attendance'] = { timestamp: Date.now(), data: attendance };
@@ -689,8 +691,159 @@ initSpreadsheet();
     }
     res.json(db.attendance.map(a => ({
       ...a,
-      status: (a.type === 'sakit' && (a.status === 'izin' || a.status === 'Izin')) ? 'Sakit' : a.status
+      status: (a.type === 'sakit' && (a.status === 'izin' || a.status === 'Izin')) ? 'Sakit' : 
+              (a.type === 'dinas_luar' && (a.status === 'izin' || a.status === 'Izin')) ? 'Dinas Luar' : 
+              a.status
     })));
+  });
+
+  app.get('/api/attendance/auto-checkout-check', async (req, res) => {
+    try {
+      let allAttendance = [];
+      let allShifts = [];
+      let allEmployees = [];
+
+      if (doc) {
+        const attSheet = await getOrCreateSheet('Attendance', ['id', 'nip', 'name', 'date', 'time', 'type', 'location', 'status', 'photoUrl', 'shift']);
+        if (attSheet) {
+          const rows = await attSheet.getRows();
+          allAttendance = rows.map(row => ({
+            id: row.get('id'),
+            nip: row.get('nip'),
+            name: row.get('name'),
+            date: row.get('date'),
+            time: row.get('time'),
+            type: row.get('type'),
+            shift: row.get('shift'),
+            location: (() => {
+              try { return JSON.parse(row.get('location')); }
+              catch (e) { return row.get('location'); }
+            })(),
+            status: row.get('status'),
+            photoUrl: row.get('photoUrl')
+          }));
+        }
+
+        const shiftSheet = await getOrCreateSheet('Shifts', ['id', 'name', 'startTime', 'endTime', 'fridayEndTime', 'saturdayEndTime', 'isActive', 'unit']);
+        if (shiftSheet) {
+          const rows = await shiftSheet.getRows();
+          allShifts = rows.map(row => ({
+            id: row.get('id'),
+            name: row.get('name'),
+            startTime: row.get('startTime'),
+            endTime: row.get('endTime'),
+            fridayEndTime: row.get('fridayEndTime'),
+            saturdayEndTime: row.get('saturdayEndTime'),
+            isActive: String(row.get('isActive')).toLowerCase() === 'true',
+            unit: row.get('unit') || ''
+          }));
+        }
+
+        const empSheet = await getOrCreateSheet('Employees', ['id', 'name', 'nip', 'unit']);
+        if (empSheet) {
+          const rows = await empSheet.getRows();
+          allEmployees = rows.map(row => ({
+            nip: row.get('nip'),
+            unit: row.get('unit') || ''
+          }));
+        }
+      } else {
+         allEmployees = db.employees;
+         allAttendance = [...db.attendance];
+      }
+
+      if (allShifts.length === 0) {
+        allShifts = [
+          { name: 'Reguler', startTime: '07:30', endTime: '16:00', fridayEndTime: '14:30', saturdayEndTime: '13:00', isActive: true, unit: '' }
+        ];
+      }
+
+      const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' });
+      const todayStr = formatter.format(new Date());
+      
+      let checkedOutCount = 0;
+      const pastInRecords = allAttendance.filter(a => a.type === 'in' && a.date < todayStr);
+
+      for (const inRecord of pastInRecords) {
+        let outDateObj = new Date(inRecord.date);
+        const outDateStr1 = formatter.format(outDateObj);
+        outDateObj.setDate(outDateObj.getDate() + 1);
+        const outDateStr2 = formatter.format(outDateObj);
+
+        let outFound = allAttendance.some(a => a.nip === inRecord.nip && a.type === 'out' && (a.date === outDateStr1 || a.date === outDateStr2));
+        
+        if (!outFound) {
+          let shiftName = inRecord.shift;
+          let targetShift = allShifts.find(s => s.name === shiftName);
+
+          if (!targetShift) {
+             const emp = allEmployees.find(e => e.nip === inRecord.nip);
+             let activeShiftsRaw = allShifts.filter(s => s.isActive);
+             let specificShifts = activeShiftsRaw.filter(s => emp && s.unit && s.unit === emp.unit);
+             let generalShifts = activeShiftsRaw.filter(s => !s.unit || s.unit === 'none' || s.unit === '');
+             let activeShifts = specificShifts.length > 0 ? specificShifts : generalShifts;
+             targetShift = activeShifts[0] || allShifts[0];
+          }
+
+          if (targetShift) {
+             const inDate = new Date(inRecord.date);
+             const dayOfWeek = inDate.getDay(); 
+             let endTimeStr = targetShift.endTime;
+             if (dayOfWeek === 5 && targetShift.fridayEndTime) endTimeStr = targetShift.fridayEndTime;
+             if (dayOfWeek === 6 && targetShift.saturdayEndTime) endTimeStr = targetShift.saturdayEndTime;
+             if (!endTimeStr) endTimeStr = '16:00'; 
+
+             let [endHour, endMin] = endTimeStr.split(':').map(Number);
+             const [startHour] = (targetShift.startTime || '07:30').split(':').map(Number);
+
+             let newEndHour = endHour - 1;
+             if (newEndHour < 0) {
+                newEndHour += 24;
+             }
+             
+             let actualOutDateObj = new Date(inRecord.date);
+             if (startHour > endHour) { 
+                actualOutDateObj.setDate(actualOutDateObj.getDate() + 1);
+             }
+
+             const outDateStr = formatter.format(actualOutDateObj);
+             const outTimeStr = `${String(newEndHour).padStart(2, '0')}.${String(endMin).padStart(2, '0')}`;
+
+             const newOutRecord = {
+                 id: Date.now().toString() + Math.random().toString().substring(2, 6),
+                 nip: inRecord.nip,
+                 name: inRecord.name,
+                 date: outDateStr,
+                 time: outTimeStr,
+                 type: 'out',
+                 location: inRecord.location || '',
+                 status: 'Hadir (Pulang Cepat)',
+                 photoUrl: inRecord.photoUrl || '' 
+             };
+
+             if (doc) {
+               const attSheet = await getOrCreateSheet('Attendance', ['id', 'nip', 'name', 'date', 'time', 'type', 'location', 'status', 'photoUrl', 'shift']);
+               if (attSheet) {
+                 await attSheet.addRow({
+                    ...newOutRecord,
+                    location: typeof newOutRecord.location === 'object' ? JSON.stringify(newOutRecord.location) : newOutRecord.location
+                 });
+                 delete cache['attendance'];
+               }
+             } else {
+                 db.attendance.push(newOutRecord);
+             }
+             
+             allAttendance.push(newOutRecord);
+             checkedOutCount++;
+          }
+        }
+      }
+      res.json({ success: true, checkedOutCount });
+    } catch (e) {
+      console.error("Error in auto-checkout-check:", e);
+      res.status(500).json({ success: false, error: e instanceof Error ? e.message : String(e) });
+    }
   });
 
   app.post('/api/attendance', async (req, res) => {

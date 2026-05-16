@@ -63,6 +63,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        await fetch('/api/attendance/auto-checkout-check').catch(() => {});
         const [empRes, attRes, setRes, shiftRes] = await Promise.all([
           fetch('/api/employees'),
           fetch('/api/attendance'),

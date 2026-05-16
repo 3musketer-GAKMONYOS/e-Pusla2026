@@ -25,7 +25,7 @@ export default function AdminAttendance() {
 
   const [generalSettings, setGeneralSettings] = useState<any>({});
   const puskesmasName = generalSettings.companyName || "Puskesmas Sehat";
-  const pimpinanName = generalSettings.pimpinanName || "Dr. Budi Santoso";
+  const pimpinanName = generalSettings.headName || "Dr. Budi Santoso";
 
   const [absensiSettings, setAbsensiSettings] = useState<any>({});
   const [shifts, setShifts] = useState<any[]>([]);
@@ -95,6 +95,7 @@ export default function AdminAttendance() {
 
   const fetchAttendance = async () => {
     try {
+      await fetch('/api/attendance/auto-checkout-check').catch(() => {});
       const response = await fetch('/api/attendance');
       if (response.ok) {
         const data = await response.json();
@@ -318,14 +319,15 @@ export default function AdminAttendance() {
         const isDinasLuar = leaveRecord.status === 'Dinas Luar' || leaveRecord.type === 'dinas_luar';
         
         let shouldGiveHours = false;
-        if (isSakit) {
+        if (isSakit || isDinasLuar) {
           let consecutiveCount = 0;
           let checkDate = new Date(date);
           checkDate.setHours(0, 0, 0, 0);
           
           while (true) {
             const hasSameLeave = empAttendance.some(a => {
-               const matchesType = a.status === 'Sakit' || a.type === 'sakit';
+               const matchesType = (isSakit && (a.status === 'Sakit' || a.type === 'sakit')) ||
+                                   (isDinasLuar && (a.status === 'Dinas Luar' || a.type === 'dinas_luar'));
                if (!matchesType) return false;
                const rDate = new Date(a.date);
                rDate.setHours(0, 0, 0, 0);
@@ -359,7 +361,11 @@ export default function AdminAttendance() {
           }
         } else if (isDinasLuar) {
           statusInfo.code = 'D';
-          statusInfo.hours = Number((6 + 25/60).toFixed(2));
+          if (shouldGiveHours) {
+            statusInfo.hours = Number((6 + 25/60).toFixed(2));
+          } else {
+            statusInfo.hours = 0;
+          }
         } else if (leaveRecord.status === 'Cuti' || leaveRecord.type === 'cuti' || leaveRecord.type === 'Cuti') {
           statusInfo.code = 'C';
         } else if (leaveRecord.status === 'izin' || leaveRecord.type === 'izin') {
