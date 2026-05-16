@@ -318,15 +318,14 @@ export default function AdminAttendance() {
         const isDinasLuar = leaveRecord.status === 'Dinas Luar' || leaveRecord.type === 'dinas_luar';
         
         let shouldGiveHours = false;
-        if (isSakit || isDinasLuar) {
+        if (isSakit) {
           let consecutiveCount = 0;
           let checkDate = new Date(date);
           checkDate.setHours(0, 0, 0, 0);
           
           while (true) {
             const hasSameLeave = empAttendance.some(a => {
-               const matchesType = (isSakit && (a.status === 'Sakit' || a.type === 'sakit')) ||
-                                   (isDinasLuar && (a.status === 'Dinas Luar' || a.type === 'dinas_luar'));
+               const matchesType = a.status === 'Sakit' || a.type === 'sakit';
                if (!matchesType) return false;
                const rDate = new Date(a.date);
                rDate.setHours(0, 0, 0, 0);
@@ -354,16 +353,14 @@ export default function AdminAttendance() {
           statusInfo.code = 'S';
           if (shouldGiveHours) {
             statusInfo.hours = Number((6 + 25/60).toFixed(2));
+          } else {
+            statusInfo.hours = 0;
           }
         }
         else if (leaveRecord.status === 'Cuti' || leaveRecord.type === 'Cuti') statusInfo.code = 'C';
         else if (isDinasLuar) {
           statusInfo.code = 'D';
-          if (shouldGiveHours) {
-            statusInfo.hours = Number((6 + 25/60).toFixed(2));
-          } else {
-            statusInfo.hours = 0;
-          }
+          statusInfo.hours = Number((6 + 25/60).toFixed(2));
         }
         else if (leaveRecord.status === 'pending') statusInfo.code = 'P';
         else statusInfo.code = leaveRecord.status?.[0] || 'M';
@@ -803,7 +800,8 @@ export default function AdminAttendance() {
 
   const handleApproveLeave = async (id: string, type: string) => {
     let finalStatus = 'Hadir'; // fallback
-    if (type === 'izin' || type === 'sakit') finalStatus = 'izin';
+    if (type === 'izin') finalStatus = 'izin';
+    else if (type === 'sakit') finalStatus = 'Sakit';
     else if (type === 'Cuti' || type === 'cuti') finalStatus = 'Cuti';
     else if (type === 'dinas_luar') finalStatus = 'Dinas Luar';
     
