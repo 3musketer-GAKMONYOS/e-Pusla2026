@@ -1005,7 +1005,7 @@ initSpreadsheet();
             kecamatan: row.get('kecamatan') || '',
             kabupaten: row.get('kabupaten') || '',
             coordinates: row.get('coordinates'),
-            radius: row.get('radius') || 100
+            radius: row.get('radius') || 250
           }));
           cache['locations'] = { data: locations, timestamp: Date.now() };
           return res.json(locations);
@@ -1015,8 +1015,8 @@ initSpreadsheet();
       }
     }
     res.json([
-      { id: "1", desa: "Kantor Induk", kecamatan: "", kabupaten: "", coordinates: "-7.1234, 112.1234", radius: 100 },
-      { id: "2", desa: "Pustu A", kecamatan: "", kabupaten: "", coordinates: "-7.1235, 112.1235", radius: 100 }
+      { id: "1", desa: "Kantor Induk", kecamatan: "", kabupaten: "", coordinates: "-7.1234, 112.1234", radius: 250 },
+      { id: "2", desa: "Pustu A", kecamatan: "", kabupaten: "", coordinates: "-7.1235, 112.1235", radius: 250 }
     ]);
   });
 
@@ -1033,7 +1033,7 @@ initSpreadsheet();
             kecamatan: location.kecamatan || '',
             kabupaten: location.kabupaten || '',
             coordinates: location.coordinates || '',
-            radius: location.radius || 100
+            radius: location.radius || 250
           });
           delete cache['locations'];
         }
