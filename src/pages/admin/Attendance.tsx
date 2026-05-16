@@ -348,22 +348,25 @@ export default function AdminAttendance() {
           }
         }
 
-        if (leaveRecord.status === 'izin' || leaveRecord.type === 'izin') statusInfo.code = 'I';
-        else if (isSakit) {
+        if (leaveRecord.status === 'pending') {
+          statusInfo.code = 'P';
+        } else if (isSakit) {
           statusInfo.code = 'S';
           if (shouldGiveHours) {
             statusInfo.hours = Number((6 + 25/60).toFixed(2));
           } else {
             statusInfo.hours = 0;
           }
-        }
-        else if (leaveRecord.status === 'Cuti' || leaveRecord.type === 'Cuti') statusInfo.code = 'C';
-        else if (isDinasLuar) {
+        } else if (isDinasLuar) {
           statusInfo.code = 'D';
           statusInfo.hours = Number((6 + 25/60).toFixed(2));
+        } else if (leaveRecord.status === 'Cuti' || leaveRecord.type === 'cuti' || leaveRecord.type === 'Cuti') {
+          statusInfo.code = 'C';
+        } else if (leaveRecord.status === 'izin' || leaveRecord.type === 'izin') {
+          statusInfo.code = 'I';
+        } else {
+          statusInfo.code = leaveRecord.status?.[0]?.toUpperCase() || 'M';
         }
-        else if (leaveRecord.status === 'pending') statusInfo.code = 'P';
-        else statusInfo.code = leaveRecord.status?.[0] || 'M';
       } else if (inRecord) {
         statusInfo.code = 'M';
         

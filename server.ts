@@ -677,7 +677,7 @@ initSpreadsheet();
               try { return JSON.parse(row.get('location')); }
               catch (e) { return row.get('location'); }
             })(),
-            status: row.get('status'),
+            status: (row.get('type') === 'sakit' && (row.get('status') === 'izin' || row.get('status') === 'Izin')) ? 'Sakit' : row.get('status'),
             photoUrl: row.get('photoUrl')
           }));
           cache['attendance'] = { timestamp: Date.now(), data: attendance };
@@ -687,7 +687,10 @@ initSpreadsheet();
         console.error('Error fetching attendance from spreadsheet:', error);
       }
     }
-    res.json(db.attendance);
+    res.json(db.attendance.map(a => ({
+      ...a,
+      status: (a.type === 'sakit' && (a.status === 'izin' || a.status === 'Izin')) ? 'Sakit' : a.status
+    })));
   });
 
   app.post('/api/attendance', async (req, res) => {

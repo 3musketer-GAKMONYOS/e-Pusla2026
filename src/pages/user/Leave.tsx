@@ -153,7 +153,7 @@ export default function UserLeave() {
       } else {
         // Auto approve immediately
         if (type === 'izin') status = 'izin';
-        else if (type === 'sakit') status = 'izin';
+        else if (type === 'sakit') status = 'Sakit';
         else if (type === 'Cuti') status = 'Cuti';
         else if (type === 'dinas_luar') status = 'Dinas Luar';
       }
