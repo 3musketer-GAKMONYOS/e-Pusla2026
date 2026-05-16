@@ -36,12 +36,12 @@ async function startServer() {
       { id: '2', name: 'Pustu' }
     ],
     settings: {
-      appName: 'Si Abon Eiite App',
+      appName: 'ePusla App',
       companyName: 'Puskesmas Sehat',
       headName: 'Dr. Budi Santoso',
       address: 'Jl. Kesehatan No. 1, Kota Sehat',
       mainLocation: '-7.250445, 112.768845',
-      tolerance: 15,
+      tolerance: 25,
     }
   };
 
